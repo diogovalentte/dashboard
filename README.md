@@ -13,3 +13,9 @@ curl -L -o /tmp/geckodriver.tar.gz https://github.com/mozilla/geckodriver/releas
 mkdir -p /opt/geckodriver/
 tar -xvf /tmp/geckodriver.tar.gz -C /opt/geckodriver/
 ```
+3. Create the file **configs/configs.json** with some configs and credentials. This file should follow the structure of the **configs/configs.example.json** file.
+4. Build and start the API in a shell:
+```
+go build -o dashboard-api
+./dashboard-api
+```

@@ -1,0 +1,15 @@
+{
+  "geckodriver": {
+    "binary_path": "/opt/geckodriver/geckodriver",
+    "port": 8085
+  },
+  "firefox": {
+    "binary_path": "/opt/firefox/firefox"
+  },
+  "notion": {
+    "token": "",
+    "game_tracker": {
+      "games_db_id": ""
+    }
+  }
+}
