@@ -1,8 +1,10 @@
 # Python
 requester.py
 .venv
+__pycache__
 
 # Etc
 etc
 dashboard-api
 configs.json
+credentials.yaml
