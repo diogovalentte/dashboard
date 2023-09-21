@@ -66,8 +66,8 @@ type GameRequest struct {
 	Status                 string    `json:"status" binding:"required"`
 	PurchasedGamePass      bool      `json:"purchased_or_gamepass" binding:"-"`
 	Stars                  int       `json:"stars" binding:"omitempty,gte=0,lte=5"`
-	StartedPlayingStr      string    `json:"started_date" binding:"omitempty,IsValidDate"`
-	StartedPlaying         time.Time `binding:"-"`
+	StartedDateStr         string    `json:"started_date" binding:"omitempty,IsValidDate"`
+	StartedDate            time.Time `binding:"-"`
 	FinishedDroppedDateStr string    `json:"finished_dropped_date" binding:"omitempty,IsValidDate"`
 	FinishedDroppedDate    time.Time `binding:"-"`
 	Commentary             string    `json:"commentary" binding:"-"`
@@ -76,12 +76,12 @@ type GameRequest struct {
 func setDateFields(gr *GameRequest) error {
 	layout := "2006-01-02"
 
-	if gr.StartedPlayingStr != "" {
-		startedPlaying, err := time.Parse(layout, gr.StartedPlayingStr)
+	if gr.StartedDateStr != "" {
+		startedDate, err := time.Parse(layout, gr.StartedDateStr)
 		if err != nil {
 			return err
 		}
-		gr.StartedPlaying = startedPlaying
+		gr.StartedDate = startedDate
 	}
 	if gr.FinishedDroppedDateStr != "" {
 		finishedDroppedDate, err := time.Parse(layout, gr.FinishedDroppedDateStr)
@@ -107,7 +107,7 @@ func mergeToGameProperties(gr *GameRequest, sgp *ScrapedGameProperties) *GamePro
 		Status:              gr.Status,
 		Stars:               gr.Stars,
 		PurchasedOrGamePass: gr.PurchasedGamePass,
-		StartedPlaying:      gr.StartedPlaying,
+		StartedDate:         gr.StartedDate,
 		FinishedDroppedDate: gr.FinishedDroppedDate,
 		Commentary:          gr.Commentary,
 	}
@@ -125,7 +125,7 @@ type GameProperties struct {
 	Status              string
 	Stars               int
 	PurchasedOrGamePass bool
-	StartedPlaying      time.Time
+	StartedDate         time.Time
 	FinishedDroppedDate time.Time
 	Commentary          string
 }
@@ -434,11 +434,11 @@ func getValidGameProperties(gp *GameProperties) *notionapi.Properties {
 		}
 	}
 
-	if !gp.StartedPlaying.IsZero() {
-		startedPlaying := notionapi.Date(gp.StartedPlaying)
-		gameProperties["Started playing"] = notionapi.DateProperty{
+	if !gp.StartedDate.IsZero() {
+		startedDate := notionapi.Date(gp.StartedDate)
+		gameProperties["Started date"] = notionapi.DateProperty{
 			Date: &notionapi.DateObject{
-				Start: &startedPlaying,
+				Start: &startedDate,
 			},
 		}
 	}
