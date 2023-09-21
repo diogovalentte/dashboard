@@ -37,15 +37,23 @@ func AddGame(c *gin.Context) {
 		panic(err)
 	}
 
-	scrapedGameProperties, err := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
+	scrapedGameProperties, err, responseError := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not get the game properties from site"})
+		if responseError {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "couldn't get the game properties from site"})
+		}
 	}
 
 	gameProperties := mergeToGameProperties(&gameRequest, scrapedGameProperties)
-	_, notionPageURL, err := createGamePage(gameProperties, (*configs).Notion.GameTracker.GamesDBID)
+	_, notionPageURL, err, responseError := createGamePage(gameProperties, (*configs).Notion.GameTracker.GamesDBID)
 	if err != nil {
-		panic(err)
+		if responseError {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "couldn't create the game page"})
+		}
 	}
 
 	c.JSON(http.StatusOK, map[string]string{"page_url": notionPageURL})
@@ -130,19 +138,23 @@ type GameProperties struct {
 	Commentary          string
 }
 
-func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*ScrapedGameProperties, error) {
+func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*ScrapedGameProperties, error, bool) {
 	// Gets game metadata from a web store (Steam)
 	gameURL = strings.SplitN(gameURL, "?", 2)[0]
+	steamPrefix := "https://store.steampowered.com/app/"
+	if isSteamURL := strings.HasPrefix(gameURL, steamPrefix); !isSteamURL {
+		return nil, fmt.Errorf("the game url %s is not a valid Steam url, it should start with: %s", gameURL, steamPrefix), true
+	}
 
 	wd, err := scraping.GetWebDriver(firefoxPath, geckoDriverServerPort)
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 	defer wd.Close()
 
 	// Get the game properties
 	if err := wd.Get(gameURL); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get the page with URL: %s", gameURL), true
 	}
 
 	timeout := 10 * time.Second
@@ -158,16 +170,16 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 				for xpath, option := range optionsXPATH {
 					err = selectFromDropdown(&wd, xpath, option)
 					if err != nil {
-						return nil, err
+						return nil, err, false
 					}
 				}
 
 				viewPageElem, err := wd.FindElement(selenium.ByXPATH, "//a[@id='view_product_page_btn']")
 				if err != nil {
-					return nil, err
+					return nil, err, false
 				}
 				if err = viewPageElem.Click(); err != nil {
-					return nil, err
+					return nil, err, false
 				}
 
 				if !secondAttempt {
@@ -176,7 +188,7 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 					thirdAttempt = true
 				}
 			} else {
-				return nil, err
+				return nil, err, false
 			}
 		} else {
 			break
@@ -186,70 +198,71 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 	// Name
 	gameNameElem, err := wd.FindElement(selenium.ByXPATH, "//div[@id='appHubAppName']")
 	if err != nil {
-		return nil, err
+		return nil, err, false
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
 	gameName, err := gameNameElem.Text()
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 
 	// Cover URL
 	coverURLElem, err := wd.FindElement(selenium.ByXPATH, "//img[@class='game_header_image_full']")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
 	coverURL, err := coverURLElem.GetAttribute("src")
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 
 	// Release date
 	releaseDateElem, err := wd.FindElement(selenium.ByXPATH, "//div[@class='release_date']/div[@class='date']")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
 	releaseDateStr, err := releaseDateElem.Text()
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 
 	steamLayout := "2 Jan, 2006"
 	releaseDate, err := time.Parse(steamLayout, releaseDateStr)
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 
 	// Tags
 	var tags []string
 	tagsElems, err := wd.FindElements(selenium.ByXPATH, "//div[contains(@class, 'glance_tags popular_tags')]/a")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
 	tags, err = getTextFromElements(tagsElems, &wd)
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 
 	// Developers
 	var developers []string
 	developersElems, err := wd.FindElements(selenium.ByXPATH, "//div[@class='dev_row']/div[contains(@class, 'subtitle')][text()='Developer:']/../div[@class='summary column']/a")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
 	developers, err = getTextFromElements(developersElems, &wd)
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 
 	// Publishers
 	var publishers []string
 	publishersElems, err := wd.FindElements(selenium.ByXPATH, "//div[@class='dev_row']/div[contains(@class, 'subtitle')][text()='Publisher:']/../div[@class='summary column']/a")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
 	publishers, err = getTextFromElements(publishersElems, &wd)
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 
 	gameProperties := ScrapedGameProperties{
@@ -261,7 +274,7 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 		Tags:        tags,
 	}
 
-	return &gameProperties, nil
+	return &gameProperties, nil, false
 }
 
 type ScrapedGameProperties struct {
@@ -313,20 +326,17 @@ func getTextFromElements(elems []selenium.WebElement, wd *selenium.WebDriver) ([
 	return elemsText, nil
 }
 
-func createGamePage(gp *GameProperties, DB_ID string) (notionapi.ObjectID, string, error) {
-	pageCreateRequest, err := getPageRequest(gp, DB_ID)
-	if err != nil {
-		return "", "", err
-	}
+func createGamePage(gp *GameProperties, DB_ID string) (notionapi.ObjectID, string, error, bool) {
+	pageCreateRequest := getPageRequest(gp, DB_ID)
 
 	client, err := util.GetNotionClient()
 	if err != nil {
-		return "", "", err
+		return "", "", err, false
 	}
 
 	page, err := client.Page.Create(context.Background(), pageCreateRequest)
 	if err != nil {
-		return "", "", err
+		return "", "", err, false
 	}
 
 	// Add commentary
@@ -354,16 +364,16 @@ func createGamePage(gp *GameProperties, DB_ID string) (notionapi.ObjectID, strin
 		if err != nil {
 			_, archivePageErr := ArchivePage(page.ID.String())
 			if archivePageErr != nil {
-				return "", "", fmt.Errorf("couldn't add commentary to the game page because of the error: %s. Also tried to archive the page, but an error occuried: %s", err, archivePageErr)
+				return "", "", fmt.Errorf("couldn't add commentary to the game page because of the error: %s. Also tried to archive the page, but an error occuried: %s", err, archivePageErr), false
 			}
-			return "", "", fmt.Errorf("couldn't add commentary to the game page because of the error: %s", err)
+			return "", "", fmt.Errorf("couldn't add commentary to the game page because of the error: %s", err), false
 		}
 	}
 
-	return page.ID, page.URL, nil
+	return page.ID, page.URL, nil, false
 }
 
-func getPageRequest(gp *GameProperties, DB_ID string) (*notionapi.PageCreateRequest, error) {
+func getPageRequest(gp *GameProperties, DB_ID string) *notionapi.PageCreateRequest {
 	validProperties := getValidGameProperties(gp)
 
 	pageCreateRequest := &notionapi.PageCreateRequest{
@@ -377,7 +387,7 @@ func getPageRequest(gp *GameProperties, DB_ID string) (*notionapi.PageCreateRequ
 		Properties: *validProperties,
 	}
 
-	return pageCreateRequest, nil
+	return pageCreateRequest
 }
 
 func getValidGameProperties(gp *GameProperties) *notionapi.Properties {
