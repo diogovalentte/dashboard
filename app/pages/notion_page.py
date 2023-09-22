@@ -2,7 +2,7 @@ import time
 
 import streamlit as st
 
-from app.api.client import GameProperties
+from app.api.client import GameProperties, get_api_client
 
 
 class NotionPage:
@@ -117,4 +117,4 @@ class NotionPage:
                         game_commentary,
                     )
 
-                    st.session_state["api_client"].add_game(game_properties)
+                    get_api_client().add_game(game_properties)

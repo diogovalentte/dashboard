@@ -9,8 +9,9 @@ from app.exceptions import APIException
 
 
 @st.cache_data()
-def set_api_client():
-    if st.session_state.get("api_client", None) is None:
+def get_api_client():
+    api_client = st.session_state.get("api_client", None)
+    if api_client is None:
         logger = logging.getLogger("api_client")
         logger.info("Defining the API client...")
 
@@ -18,6 +19,8 @@ def set_api_client():
         st.session_state["api_client"] = api_client
 
         logger.info("API client defined")
+
+    return api_client
 
 
 class JSONBody:
