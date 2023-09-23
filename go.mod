@@ -6,6 +6,7 @@ require (
 	github.com/diogovalentte/notionapi v0.0.0-20230920031832-8908a9a7790a
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-playground/validator/v10 v10.14.0
+	github.com/google/uuid v1.1.2
 	github.com/spf13/viper v1.16.0
 	github.com/tebeka/selenium v0.9.9
 )

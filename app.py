@@ -36,8 +36,14 @@ def select_page():
 
 
 def sidebar():
+    api_client = get_api_client()
+
     select_page()
     st.sidebar.divider()
+
+    # Jobs
+    api_client.show_all_jobs_updating()
+
 
 def main():
     if st.session_state.get("authentication_status") in (None, False):

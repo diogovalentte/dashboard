@@ -1,5 +1,6 @@
 import datetime
 import logging
+import time
 from urllib.parse import urljoin
 
 import requests
@@ -51,8 +52,10 @@ class GameProperties(JSONBody):
             "status": status,
             "purchased_or_gamepass": purchased_or_gamepass,
             "stars": stars,
-            "started_date": started_date,
-            "finished_dropped_date": finished_dropped_date,
+            "started_date": str(started_date) if started_date is not None else "",
+            "finished_dropped_date": str(finished_dropped_date)
+            if finished_dropped_date is not None
+            else "",
             "commentary": commentary,
         }
 
@@ -67,13 +70,28 @@ class GameProperties(JSONBody):
 class APIClient:
     def __init__(self, base_URL: str, port: int) -> None:
         self.base_url = f"{base_URL}:{port}"
+        self.acceptable_status_codes = (200, 400)
 
-    def add_game(self, game_properties: GameProperties):
+    def add_game(self, game_properties: GameProperties) -> None:
         path = "/v1/notion/games_tracker/add_game"
         url = urljoin(self.base_url, path)
 
         res = requests.post(url, json=game_properties.json)
 
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while adding game to games tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
+    def get_all_jobs(self) -> list:
+        path = "/v1/jobs/get_all"
+        url = urljoin(self.base_url, path)
+
+        res = requests.get(url)
         if res.status_code != 200:
             raise APIException(
                 "error while adding game to games tracker database",
@@ -82,3 +100,53 @@ class APIClient:
                 res.status_code,
                 res.text,
             )
+
+        return res.json().get("jobs", [])
+
+    def show_all_jobs(self, jobs_placeholder: st.delta_generator.DeltaGenerator):
+        jobs = self.get_all_jobs()
+
+        states = {
+            "Completed": "complete",
+            "Failed": "error",
+            "Starting": "running",
+            "Executing": "running",
+        }
+        if len(jobs) > 0:
+            with jobs_placeholder.container():
+                jobs.reverse()
+                for job in jobs:
+                    state = job["State"]
+                    state_description = job["StateDescription"]
+                    value = job["Value"]
+                    created_at = job["CreatedAt"]
+                    completed_failed_at = job["Completed_Failed_At"]
+
+                    status = st.status(job["Task"], state=states[state])
+
+                    if state in ("Starting", "Executing"):
+                        status.info(state_description)
+                    elif state == "Completed":
+                        status.success(state_description)
+                    elif state == "Failed":
+                        status.error(state_description)
+
+                    if value != "":
+                        status.info(value)
+
+                    status.markdown(
+                        f"<strong>Created at</strong>: {created_at}",
+                        unsafe_allow_html=True,
+                    )
+                    if completed_failed_at != "":
+                        status.markdown(
+                            f"<strong>{state} at</strong>: {completed_failed_at}",
+                            unsafe_allow_html=True,
+                        )
+
+    def show_all_jobs_updating(self, seconds: int = 1):
+        st.sidebar.title("Jobs")
+        jobs_placeholder = st.sidebar.empty()
+        while True:
+            self.show_all_jobs(jobs_placeholder)
+            time.sleep(seconds)

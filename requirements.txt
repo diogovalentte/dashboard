@@ -37,7 +37,7 @@ rich==13.5.2
 rpds-py==0.10.3
 six==1.16.0
 smmap==5.0.0
-streamlit==1.26.0
+streamlit==1.27.0
 streamlit-authenticator==0.2.3
 tenacity==8.2.3
 toml==0.10.2

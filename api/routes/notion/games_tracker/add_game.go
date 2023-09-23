@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/diogovalentte/dashboard/api/job"
 	"github.com/diogovalentte/dashboard/api/scraping"
 	"github.com/diogovalentte/dashboard/api/util"
 	"github.com/diogovalentte/notionapi"
@@ -16,47 +17,87 @@ import (
 	"github.com/tebeka/selenium"
 )
 
+// State
 func AddGame(c *gin.Context) {
+	// Create the job
+	currentJob := job.Job{
+		Task:      "Add game to Games Tracker database",
+		State:     "Starting",
+		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
+	}
+	currentJob.SetStartingState("Processing game request")
+
+	jobsList, ok := c.MustGet("JobsList").(*job.Jobs)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't create the task's job"})
+	}
+	jobsList.AddJob(&currentJob)
+
+	// Start the task
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("IsValidDate", util.IsValidDate)
 	}
 
 	var gameRequest GameRequest
 	if err := c.ShouldBindJSON(&gameRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON fields, refer to the API documentation"})
+		err = fmt.Errorf("invalid JSON fields, refer to the API documentation")
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	err := setDateFields(&gameRequest)
 	if err != nil {
-		panic(err)
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	configs, err := util.GetConfigs()
 	if err != nil {
-		panic(err)
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	scrapedGameProperties, err, responseError := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
-	if err != nil {
-		if responseError {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "couldn't get the game properties from site"})
+	// Get game info from a web store and create the game notion page
+	go func() {
+		currentJob.SetExecutingStateWithValue("Scraping game data", gameRequest.URL)
+
+		scrapedGameProperties, err, responseError := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
+		if err != nil {
+			if responseError {
+				currentJob.SetFailedState(err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			} else {
+				err = fmt.Errorf("couldn't get the game properties from site")
+				currentJob.SetFailedState(err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 		}
-	}
 
-	gameProperties := mergeToGameProperties(&gameRequest, scrapedGameProperties)
-	_, notionPageURL, err, responseError := createGamePage(gameProperties, (*configs).Notion.GameTracker.GamesDBID)
-	if err != nil {
-		if responseError {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "couldn't create the game page"})
+		currentJob.SetExecutingStateWithValue("Creating game page", scrapedGameProperties.Name)
+
+		gameProperties := mergeToGameProperties(&gameRequest, scrapedGameProperties)
+		_, notionPageURL, err, responseError := createGamePage(gameProperties, (*configs).Notion.GameTracker.GamesDBID)
+		if err != nil {
+			if responseError {
+				currentJob.SetFailedState(err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			} else {
+				err = fmt.Errorf("couldn't create the game page")
+				currentJob.SetFailedState(err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 		}
-	}
 
-	c.JSON(http.StatusOK, map[string]string{"page_url": notionPageURL})
+		currentJob.SetCompletedStateWithValue("Game page created", notionPageURL)
+	}()
+	c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
 }
 
 func gameNameCondition(wd selenium.WebDriver) (bool, error) {
@@ -198,7 +239,6 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 	// Name
 	gameNameElem, err := wd.FindElement(selenium.ByXPATH, "//div[@id='appHubAppName']")
 	if err != nil {
-		return nil, err, false
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
 	gameName, err := gameNameElem.Text()

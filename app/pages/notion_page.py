@@ -1,5 +1,3 @@
-import time
-
 import streamlit as st
 
 from app.api.client import GameProperties, get_api_client
@@ -7,6 +5,8 @@ from app.api.client import GameProperties, get_api_client
 
 class NotionPage:
     def show(self):
+        api_client = get_api_client()
+
         st.header("Notion")
         games_tracker_tab, media_tracker_tab = st.tabs(
             ["Games tracker", "Media tracker"]
@@ -98,7 +98,6 @@ class NotionPage:
                 )
 
                 submitted = st.form_submit_button()
-                st.write(submitted)
 
                 if submitted:
                     if no_game_started_date:
@@ -117,4 +116,6 @@ class NotionPage:
                         game_commentary,
                     )
 
-                    get_api_client().add_game(game_properties)
+                    api_client.add_game(game_properties)
+
+                    st.success("Requested game page")
