@@ -62,7 +62,7 @@ func TestGetGameMetadata(t *testing.T) {
 
 	expected := games_tracker.ScrapedGameProperties{
 		Name:        "Red Dead Redemption 2",
-		CoverURL:    "https://cdn.akamai.steamstatic.com/steam/apps/1174180/header.jpg?t=1671485009",
+		CoverURL:    "https://cdn.akamai.steamstatic.com/steam/apps/1174180/header.jpg?t=1695140956",
 		ReleaseDate: time.Date(2019, 12, 5, 0, 0, 0, 0, time.UTC),
 		Developers:  []string{"Rockstar Games"},
 		Publishers:  []string{"Rockstar Games"},
@@ -70,7 +70,7 @@ func TestGetGameMetadata(t *testing.T) {
 	}
 
 	gameURL := "https://store.steampowered.com/app/1174180/Red_Dead_Redemption_2"
-	actual, err := games_tracker.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
+	actual, err, _ := games_tracker.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -139,11 +139,12 @@ func TestAddGameRoute(t *testing.T) {
 			t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
 		}
 
-		pageURL, exists := resMap["page_url"]
+		msg, exists := resMap["message"]
 		if !exists {
-			t.Error(`Response body has no field "page_url"`)
+			t.Error(`Response body has no field "message"`)
 		}
-
-		t.Log(pageURL)
+		if msg != "Job created with success" {
+			t.Error(`Field "message" in the response is not equal to "Job created with success"`)
+		}
 	}
 }
