@@ -170,7 +170,11 @@ class APIClient:
                     created_at = job["CreatedAt"]
                     completed_failed_at = job["Completed_Failed_At"]
 
-                    status = st.status(job["Task"], state=states[state])
+                    expanded = True if state in ("Starting", "Executing") else False
+
+                    status = st.status(
+                        job["Task"], state=states[state], expanded=expanded
+                    )
 
                     if state in ("Starting", "Executing"):
                         status.info(state_description)
