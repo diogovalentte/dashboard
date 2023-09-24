@@ -2,10 +2,10 @@ import logging
 
 import streamlit as st
 
-from app.api.client import get_api_client
-from app.pages.authenticator_page import AuthenticatorPage
-from app.pages.main_page import MainPage
-from app.pages.notion_page import NotionPage
+from dashboard.api.client import get_api_client
+from dashboard.pages.authenticator_page import AuthenticatorPage
+from dashboard.pages.main_page import MainPage
+from dashboard.pages.notion_page import NotionPage
 
 st.set_page_config(
     page_title="Personal dashboard",

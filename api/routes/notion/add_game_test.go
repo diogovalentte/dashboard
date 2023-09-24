@@ -1,66 +1,26 @@
-package games_tracker_test
+package notion_test
 
 import (
 	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/diogovalentte/dashboard/api"
-	"github.com/diogovalentte/dashboard/api/routes/notion/games_tracker"
-	"github.com/diogovalentte/dashboard/api/scraping"
+	"github.com/diogovalentte/dashboard/api/routes/notion"
 	"github.com/diogovalentte/dashboard/api/util"
 )
 
-func startGeckoDriverServer(GeckoDriverPath string, Port int) (*scraping.GeckoDriverServer, error) {
-	gds := scraping.NewGeckoDriverServer(GeckoDriverPath, Port)
-
-	go gds.Start()
-
-	err := gds.Wait()
-	if err != nil {
-		return nil, err
-	}
-
-	return gds, nil
-}
-
-func stopGeckoDriverServer(gds *scraping.GeckoDriverServer) error {
-	return gds.Stop()
-}
-
-func TestMain(m *testing.M) {
-	configs, err := util.GetConfigsWithoutDefaults("../../../../configs")
-	if err != nil {
-		panic(err)
-	}
-
-	gds, err := startGeckoDriverServer(configs.GeckoDriver.BinaryPath, configs.GeckoDriver.Port)
-	if err != nil {
-		panic(err)
-	}
-
-	exitCode := m.Run()
-
-	err = stopGeckoDriverServer(gds)
-	if err != nil {
-		panic(err)
-	}
-
-	os.Exit(exitCode)
-}
-
 func TestGetGameMetadata(t *testing.T) {
-	configs, err := util.GetConfigsWithoutDefaults("../../../../configs")
+	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
 		panic(err)
 	}
 
-	expected := games_tracker.ScrapedGameProperties{
+	expected := notion.ScrapedGameProperties{
 		Name:        "Red Dead Redemption 2",
 		CoverURL:    "https://cdn.akamai.steamstatic.com/steam/apps/1174180/header.jpg?t=1695140956",
 		ReleaseDate: time.Date(2019, 12, 5, 0, 0, 0, 0, time.UTC),
@@ -70,7 +30,7 @@ func TestGetGameMetadata(t *testing.T) {
 	}
 
 	gameURL := "https://store.steampowered.com/app/1174180/Red_Dead_Redemption_2"
-	actual, err, _ := games_tracker.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
+	actual, err, _ := notion.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -80,7 +40,7 @@ func TestGetGameMetadata(t *testing.T) {
 	}
 }
 
-var addGameRouteTestTable = []*games_tracker.GameRequest{
+var addGameRouteTestTable = []*notion.GameRequest{
 	{
 		URL:                    "https://store.steampowered.com/app/105600/Terraria/",
 		Priority:               "Low",

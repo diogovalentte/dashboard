@@ -8,8 +8,11 @@
   },
   "notion": {
     "token": "",
-    "game_tracker": {
-      "games_db_id": ""
+    "games_tracker": {
+      "db_id": ""
+    },
+    "medias_tracker": {
+      "db_id": ""
     }
   }
 }

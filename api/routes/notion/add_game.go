@@ -1,4 +1,4 @@
-package games_tracker
+package notion
 
 import (
 	"context"
@@ -35,7 +35,7 @@ func AddGame(c *gin.Context) {
 
 	// Start the task
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterValidation("IsValidDate", util.IsValidDate)
+		v.RegisterValidation("IsValidDate", IsValidDate)
 	}
 
 	var gameRequest GameRequest
@@ -46,7 +46,7 @@ func AddGame(c *gin.Context) {
 		return
 	}
 
-	err := setDateFields(&gameRequest)
+	err := SetStructDateFields(&gameRequest)
 	if err != nil {
 		currentJob.SetFailedState(err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -81,7 +81,7 @@ func AddGame(c *gin.Context) {
 		currentJob.SetExecutingStateWithValue("Creating game page", scrapedGameProperties.Name)
 
 		gameProperties := mergeToGameProperties(&gameRequest, scrapedGameProperties)
-		_, notionPageURL, err, responseError := createGamePage(gameProperties, (*configs).Notion.GameTracker.GamesDBID)
+		_, notionPageURL, err, responseError := createGamePage(gameProperties, (*configs).Notion.GamesTracker.DBID)
 		if err != nil {
 			if responseError {
 				currentJob.SetFailedState(err)
@@ -100,15 +100,6 @@ func AddGame(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
 }
 
-func gameNameCondition(wd selenium.WebDriver) (bool, error) {
-	_, err := wd.FindElement(selenium.ByXPATH, "//div[@id='appHubAppName']")
-	if err != nil {
-		return false, nil
-	}
-
-	return true, nil
-}
-
 type GameRequest struct {
 	URL                    string    `json:"url" binding:"required,http_url"`
 	Priority               string    `json:"priority" binding:"required"`
@@ -122,25 +113,20 @@ type GameRequest struct {
 	Commentary             string    `json:"commentary" binding:"-"`
 }
 
-func setDateFields(gr *GameRequest) error {
-	layout := "2006-01-02"
+func (gr *GameRequest) GetStartedDateStr() string {
+	return gr.StartedDateStr
+}
 
-	if gr.StartedDateStr != "" {
-		startedDate, err := time.Parse(layout, gr.StartedDateStr)
-		if err != nil {
-			return err
-		}
-		gr.StartedDate = startedDate
-	}
-	if gr.FinishedDroppedDateStr != "" {
-		finishedDroppedDate, err := time.Parse(layout, gr.FinishedDroppedDateStr)
-		if err != nil {
-			return err
-		}
-		gr.FinishedDroppedDate = finishedDroppedDate
-	}
+func (gr *GameRequest) GetFinishedDroppedDateStr() string {
+	return gr.FinishedDroppedDateStr
+}
 
-	return nil
+func (gr *GameRequest) SetStartedDate(startedDate time.Time) {
+	gr.StartedDate = startedDate
+}
+
+func (gr *GameRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
+	gr.FinishedDroppedDate = finishedDroppedDate
 }
 
 func mergeToGameProperties(gr *GameRequest, sgp *ScrapedGameProperties) *GameProperties {
@@ -278,7 +264,7 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
-	tags, err = getTextFromElements(tagsElems, &wd)
+	tags, err = getTextFromDisplayNoneElements(tagsElems, &wd)
 	if err != nil {
 		return nil, err, false
 	}
@@ -289,7 +275,7 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
-	developers, err = getTextFromElements(developersElems, &wd)
+	developers, err = getTextFromDisplayNoneElements(developersElems, &wd)
 	if err != nil {
 		return nil, err, false
 	}
@@ -300,7 +286,7 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
 	}
-	publishers, err = getTextFromElements(publishersElems, &wd)
+	publishers, err = getTextFromDisplayNoneElements(publishersElems, &wd)
 	if err != nil {
 		return nil, err, false
 	}
@@ -315,6 +301,15 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 	}
 
 	return &gameProperties, nil, false
+}
+
+func gameNameCondition(wd selenium.WebDriver) (bool, error) {
+	_, err := wd.FindElement(selenium.ByXPATH, "//div[@id='appHubAppName']")
+	if err != nil {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 type ScrapedGameProperties struct {
@@ -346,7 +341,7 @@ func selectFromDropdown(wd *selenium.WebDriver, xpath, option string) error {
 	return nil
 }
 
-func getTextFromElements(elems []selenium.WebElement, wd *selenium.WebDriver) ([]string, error) {
+func getTextFromDisplayNoneElements(elems []selenium.WebElement, wd *selenium.WebDriver) ([]string, error) {
 	// Some tags have style "display: none", so this work around is needed to get the tag text
 	var elemsText []string
 	for _, elem := range elems {
@@ -367,9 +362,9 @@ func getTextFromElements(elems []selenium.WebElement, wd *selenium.WebDriver) ([
 }
 
 func createGamePage(gp *GameProperties, DB_ID string) (notionapi.ObjectID, string, error, bool) {
-	pageCreateRequest := getPageRequest(gp, DB_ID)
+	pageCreateRequest := getGamePageRequest(gp, DB_ID)
 
-	client, err := util.GetNotionClient()
+	client, err := GetNotionClient()
 	if err != nil {
 		return "", "", err, false
 	}
@@ -413,7 +408,7 @@ func createGamePage(gp *GameProperties, DB_ID string) (notionapi.ObjectID, strin
 	return page.ID, page.URL, nil, false
 }
 
-func getPageRequest(gp *GameProperties, DB_ID string) *notionapi.PageCreateRequest {
+func getGamePageRequest(gp *GameProperties, DB_ID string) *notionapi.PageCreateRequest {
 	validProperties := getValidGameProperties(gp)
 
 	pageCreateRequest := &notionapi.PageCreateRequest{
@@ -503,39 +498,4 @@ func getValidGameProperties(gp *GameProperties) *notionapi.Properties {
 	}
 
 	return &gameProperties
-}
-
-func transformIntoMultiSelect(array *[]string) *[]notionapi.Option {
-	var options []notionapi.Option
-	for _, elem := range *array {
-		option := notionapi.Option{
-			Name: elem,
-		}
-		options = append(options, option)
-	}
-
-	return &options
-}
-
-func getStarsEmojis(number int) string {
-	emoji := "⭐"
-	return strings.Repeat(emoji, number)
-}
-
-func ArchivePage(pageId string) (bool, error) {
-	// Archive a page, returns wheter the page is archived or not
-	client, err := util.GetNotionClient()
-	if err != nil {
-		return false, err
-	}
-
-	page, err := client.Page.Update(context.Background(), notionapi.PageID(pageId), &notionapi.PageUpdateRequest{
-		Properties: notionapi.Properties{},
-		Archived:   true,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	return page.Archived, nil
 }

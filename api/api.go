@@ -26,6 +26,7 @@ func SetupRouter() *gin.Engine {
 	notionGroup := v1.Group("/notion")
 	{
 		notion.GamesTrackerRoutes(notionGroup)
+		notion.MediasTrackerRoutes(notionGroup)
 	}
 	// Jobs routes
 	jobsGroup := v1.Group("/jobs")

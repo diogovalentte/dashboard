@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 import requests
 import streamlit as st
 
-from app.exceptions import APIException
+from dashboard.exceptions import APIException
 
 
 @st.cache_data()
@@ -67,6 +67,39 @@ class GameProperties(JSONBody):
         return self.game_properties
 
 
+class MediaProperties(JSONBody):
+    def __init__(
+        self,
+        URL: str,
+        media_type: str,
+        priority: str,
+        status: str,
+        stars: str,
+        started_date: datetime.date | None = None,
+        finished_dropped_date: datetime.date | None = None,
+        commentary: str | None = None,
+    ) -> None:
+        self.media_properties = {
+            "url": URL,
+            "type": media_type,
+            "priority": priority,
+            "status": status,
+            "stars": stars,
+            "started_date": str(started_date) if started_date is not None else "",
+            "finished_dropped_date": str(finished_dropped_date)
+            if finished_dropped_date is not None
+            else "",
+            "commentary": commentary,
+        }
+
+    @property
+    def json(self) -> dict:
+        return self._get_json()
+
+    def _get_json(self) -> dict:
+        return self.media_properties
+
+
 class APIClient:
     def __init__(self, base_URL: str, port: int) -> None:
         self.base_url = f"{base_URL}:{port}"
@@ -81,6 +114,21 @@ class APIClient:
         if res.status_code not in self.acceptable_status_codes:
             raise APIException(
                 "error while adding game to games tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
+    def add_media(self, media_properties: MediaProperties) -> None:
+        path = "/v1/notion/medias_tracker/add_media"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json=media_properties.json)
+
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while adding media to medias tracker database",
                 url,
                 "POST",
                 res.status_code,

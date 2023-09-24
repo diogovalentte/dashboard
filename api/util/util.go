@@ -2,10 +2,7 @@ package util
 
 import (
 	"reflect"
-	"time"
 
-	"github.com/diogovalentte/notionapi"
-	"github.com/go-playground/validator/v10"
 	"github.com/spf13/viper"
 )
 
@@ -25,12 +22,17 @@ type FirefoxConfigs struct {
 }
 
 type NotionConfigs struct {
-	Token       string             `mapstructure:"token"`
-	GameTracker GameTrackerConfigs `mapstructure:"game_tracker"`
+	Token         string               `mapstructure:"token"`
+	GamesTracker  GamesTrackerConfigs  `mapstructure:"games_tracker"`
+	MediasTracker MediasTrackerConfigs `mapstructure:"medias_tracker"`
 }
 
-type GameTrackerConfigs struct {
-	GamesDBID string `mapstructure:"games_db_id"`
+type GamesTrackerConfigs struct {
+	DBID string `mapstructure:"db_id"`
+}
+
+type MediasTrackerConfigs struct {
+	DBID string `mapstructure:"db_id"`
 }
 
 var configs Configs
@@ -59,20 +61,4 @@ func GetConfigsWithoutDefaults(configPath string) (*Configs, error) {
 func GetConfigs() (*Configs, error) {
 	defaultConfigPath := "configs"
 	return GetConfigsWithoutDefaults(defaultConfigPath)
-}
-
-func IsValidDate(fl validator.FieldLevel) bool {
-	layout := "2006-01-02"
-	_, err := time.Parse(layout, fl.Field().String())
-
-	return err == nil
-}
-
-func GetNotionClient() (*notionapi.Client, error) {
-	configs, err := GetConfigs()
-	if err != nil {
-		return nil, err
-	}
-
-	return notionapi.NewClient(notionapi.Token(configs.Notion.Token)), nil
 }
