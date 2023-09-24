@@ -76,6 +76,7 @@ func SetStructDateFields(input StructDateFields) error {
 func transformIntoMultiSelect(array *[]string) *[]notionapi.Option {
 	var options []notionapi.Option
 	for _, elem := range *array {
+		elem := strings.ReplaceAll(elem, ",", "")
 		option := notionapi.Option{
 			Name: elem,
 		}
