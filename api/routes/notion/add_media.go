@@ -17,12 +17,10 @@ import (
 	"github.com/tebeka/selenium"
 )
 
-// State
 func AddMedia(c *gin.Context) {
-	// Create the job
+	// Create job
 	currentJob := job.Job{
 		Task:      "Add media to Medias Tracker database",
-		State:     "Starting",
 		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
 	}
 	currentJob.SetStartingState("Processing media request")
@@ -33,7 +31,7 @@ func AddMedia(c *gin.Context) {
 	}
 	jobsList.AddJob(&currentJob)
 
-	// Start the task
+	// Validate request
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("IsValidDate", IsValidDate)
 	}
@@ -53,6 +51,7 @@ func AddMedia(c *gin.Context) {
 		return
 	}
 
+	// Get media info from a media site and create the media notion page
 	configs, err := util.GetConfigs()
 	if err != nil {
 		currentJob.SetFailedState(err)
@@ -61,42 +60,16 @@ func AddMedia(c *gin.Context) {
 	}
 
 	// Get media info from a web store and create the media notion page
-	go func() {
-		currentJob.SetExecutingStateWithValue("Scraping media data", mediaRequest.URL)
-
-		scrapedMediaProperties, err, setErrorAsStateDescription := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
-		if err != nil {
-			if setErrorAsStateDescription {
-				currentJob.SetFailedState(err)
-				return
-			} else {
-				err = fmt.Errorf("couldn't get the media properties from site")
-				currentJob.SetFailedState(err)
-				return
-			}
-		}
-
-		currentJob.SetExecutingStateWithValue("Creating media page", scrapedMediaProperties.Name)
-
-		mediaProperties := mergeToMediaProperties(&mediaRequest, scrapedMediaProperties)
-		_, notionPageURL, err, setErrorAsStateDescription := createMediaPage(mediaProperties, (*configs).Notion.MediasTracker.DBID)
-		if err != nil {
-			if setErrorAsStateDescription {
-				currentJob.SetFailedState(err)
-				return
-			} else {
-				err = fmt.Errorf("couldn't create the media page")
-				currentJob.SetFailedState(err)
-				return
-			}
-		}
-
-		currentJob.SetCompletedStateWithValue("Media page created", notionPageURL)
-	}()
-	c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
+	if !mediaRequest.Wait {
+		go addMediaTask(&currentJob, &mediaRequest, configs, c, mediaRequest.Wait)
+		c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
+	} else {
+		addMediaTask(&currentJob, &mediaRequest, configs, c, mediaRequest.Wait)
+	}
 }
 
 type MediaRequest struct {
+	Wait                   bool      `json:"wait" binding:"-"` // Wether the requester wants to wait for the task to be done before responding
 	URL                    string    `json:"url" binding:"required,http_url"`
 	MediaType              string    `json:"type" binding:"required"`
 	Priority               string    `json:"priority" binding:"required"`
@@ -125,38 +98,53 @@ func (mr *MediaRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
 	mr.FinishedDroppedDate = finishedDroppedDate
 }
 
-func mergeToMediaProperties(mr *MediaRequest, smp *ScrapedMediaProperties) *MediaProperties {
-	return &MediaProperties{
-		Name:                smp.Name,
-		URL:                 mr.URL,
-		MediaType:           mr.MediaType,
-		CoverURL:            smp.CoverURL,
-		ReleaseDate:         smp.ReleaseDate,
-		Genres:              smp.Genres,
-		Staff:               smp.Staff,
-		Priority:            mr.Priority,
-		Status:              mr.Status,
-		Stars:               mr.Stars,
-		StartedDate:         mr.StartedDate,
-		FinishedDroppedDate: mr.FinishedDroppedDate,
-		Commentary:          mr.Commentary,
-	}
-}
+func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util.Configs, c *gin.Context, wait bool) {
+	currentJob.SetExecutingStateWithValue("Scraping media data", mediaRequest.URL)
 
-type MediaProperties struct {
-	Name                string
-	URL                 string
-	MediaType           string
-	CoverURL            string
-	ReleaseDate         time.Time
-	Genres              []string
-	Staff               []string
-	Priority            string
-	Status              string
-	Stars               int
-	StartedDate         time.Time
-	FinishedDroppedDate time.Time
-	Commentary          string
+	scrapedMediaProperties, err, setErrorAsStateDescription := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
+	if err != nil {
+		if setErrorAsStateDescription {
+			currentJob.SetFailedState(err)
+			if wait {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			}
+			return
+		} else {
+			err = fmt.Errorf("couldn't get the media properties from site")
+			currentJob.SetFailedState(err)
+			if wait {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			}
+			return
+		}
+	}
+
+	currentJob.SetExecutingStateWithValue("Creating media page", scrapedMediaProperties.Name)
+
+	mediaProperties := mergeToMediaProperties(mediaRequest, scrapedMediaProperties)
+	_, notionPageURL, err, setErrorAsStateDescription := createMediaPage(mediaProperties, (*configs).Notion.MediasTracker.DBID)
+	if err != nil {
+		if setErrorAsStateDescription {
+			currentJob.SetFailedState(err)
+			if wait {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			}
+			return
+		} else {
+			err = fmt.Errorf("couldn't create the media page")
+			currentJob.SetFailedState(err)
+			if wait {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			}
+			return
+		}
+	}
+
+	currentJob.SetCompletedStateWithValue("Media page created", notionPageURL)
+
+	if wait {
+		c.JSON(http.StatusOK, gin.H{"message": "Media page created with success"})
+	}
 }
 
 func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (*ScrapedMediaProperties, error, bool) {
@@ -241,7 +229,7 @@ func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (
 		return nil, err, false
 	}
 
-	mediaProperties := ScrapedMediaProperties{
+	scrapedMediaProperties := ScrapedMediaProperties{
 		Name:        mediaName,
 		CoverURL:    coverURL,
 		ReleaseDate: releaseDate,
@@ -249,7 +237,15 @@ func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (
 		Staff:       staff,
 	}
 
-	return &mediaProperties, nil, false
+	return &scrapedMediaProperties, nil, false
+}
+
+type ScrapedMediaProperties struct {
+	Name        string
+	CoverURL    string
+	ReleaseDate time.Time
+	Genres      []string
+	Staff       []string
 }
 
 func mediaNameCondition(wd selenium.WebDriver) (bool, error) {
@@ -261,12 +257,38 @@ func mediaNameCondition(wd selenium.WebDriver) (bool, error) {
 	return true, nil
 }
 
-type ScrapedMediaProperties struct {
-	Name        string
-	CoverURL    string
-	ReleaseDate time.Time
-	Genres      []string
-	Staff       []string
+func mergeToMediaProperties(mr *MediaRequest, smp *ScrapedMediaProperties) *MediaProperties {
+	return &MediaProperties{
+		Name:                smp.Name,
+		URL:                 mr.URL,
+		MediaType:           mr.MediaType,
+		CoverURL:            smp.CoverURL,
+		ReleaseDate:         smp.ReleaseDate,
+		Genres:              smp.Genres,
+		Staff:               smp.Staff,
+		Priority:            mr.Priority,
+		Status:              mr.Status,
+		Stars:               mr.Stars,
+		StartedDate:         mr.StartedDate,
+		FinishedDroppedDate: mr.FinishedDroppedDate,
+		Commentary:          mr.Commentary,
+	}
+}
+
+type MediaProperties struct {
+	Name                string
+	URL                 string
+	MediaType           string
+	CoverURL            string
+	ReleaseDate         time.Time
+	Genres              []string
+	Staff               []string
+	Priority            string
+	Status              string
+	Stars               int
+	StartedDate         time.Time
+	FinishedDroppedDate time.Time
+	Commentary          string
 }
 
 func createMediaPage(mp *MediaProperties, DB_ID string) (notionapi.ObjectID, string, error, bool) {

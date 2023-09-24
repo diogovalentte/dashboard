@@ -40,32 +40,34 @@ func TestGetMediaMetadata(t *testing.T) {
 }
 
 var addMediaRouteTestTable = []*notion.MediaRequest{
+	// {
+	// 	Wait:      true,
+	// 	MediaType: "Series",
+	// 	URL:       "https://www.imdb.com/title/tt1865718/?ref_=fn_al_tt_1",
+	// 	Priority:  "High",
+	// 	Status:    "Finished",
+	// },
+	// {
+	// 	Wait:                   true,
+	// 	URL:                    "https://www.imdb.com/title/tt1586680",
+	// 	MediaType:              "Series",
+	// 	Priority:               "High",
+	// 	Status:                 "To be released",
+	// 	Stars:                  5,
+	// 	StartedDateStr:         "2022-12-01",
+	// 	FinishedDroppedDateStr: "2023-01-05",
+	// 	Commentary:             "Shameless",
+	// },
 	{
-		URL:                    "https://store.steampowered.com/app/105600/Terraria/",
-		Priority:               "Low",
-		Status:                 "Dropped",
-		Stars:                  3,
-		StartedDateStr:         "2023-01-01",
-		FinishedDroppedDateStr: "2023-01-02",
-		Commentary:             "Not my type.",
-	},
-	{
-		URL:                    "https://store.steampowered.com/app/1174180/Red_Dead_Redemption_2/?l=brazilian",
-		Priority:               "High",
-		Status:                 "Finished",
-		Stars:                  5,
-		StartedDateStr:         "2022-12-01",
-		FinishedDroppedDateStr: "2023-01-05",
-		Commentary:             "One of the best medias of all time.",
-	},
-	{
-		URL:                    "https://store.steampowered.com/app/1282100/Remnant_II/",
+		Wait:                   true,
+		URL:                    "https://www.imdb.com/title/tt0468569/?ref_=chttp_t_3",
+		MediaType:              "Movie",
 		Priority:               "Medium",
-		Status:                 "Playing",
+		Status:                 "Watching/Reading",
 		Stars:                  5,
 		StartedDateStr:         "2023-07-29",
 		FinishedDroppedDateStr: "2023-08-12",
-		Commentary:             "The biggest surprise of 2023.",
+		Commentary:             "Batman",
 	},
 }
 
@@ -95,12 +97,15 @@ func TestAddMediaRoute(t *testing.T) {
 			t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
 		}
 
-		msg, exists := resMap["message"]
+		expectedMessage := "Media page created with success"
+		actualMessage, exists := resMap["message"]
 		if !exists {
 			t.Error(`Response body has no field "message"`)
 		}
-		if msg != "Job created with success" {
-			t.Error(`Field "message" in the response is not equal to "Job created with success"`)
+		if actualMessage != expectedMessage {
+			t.Errorf(`expected message: %s, actual message: %s`, expectedMessage, actualMessage)
 		}
+
+		t.Log(actualMessage)
 	}
 }

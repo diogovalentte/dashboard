@@ -42,9 +42,10 @@ func TestGetGameMetadata(t *testing.T) {
 
 var addGameRouteTestTable = []*notion.GameRequest{
 	{
+		Wait:                   true,
 		URL:                    "https://store.steampowered.com/app/105600/Terraria/",
 		Priority:               "Low",
-		Status:                 "Dropped",
+		Status:                 "Playing",
 		PurchasedGamePass:      false,
 		Stars:                  3,
 		StartedDateStr:         "2023-01-01",
@@ -52,6 +53,7 @@ var addGameRouteTestTable = []*notion.GameRequest{
 		Commentary:             "Not my type.",
 	},
 	{
+		Wait:                   true,
 		URL:                    "https://store.steampowered.com/app/1174180/Red_Dead_Redemption_2/?l=brazilian",
 		Priority:               "High",
 		Status:                 "Finished",
@@ -62,6 +64,7 @@ var addGameRouteTestTable = []*notion.GameRequest{
 		Commentary:             "One of the best games of all time.",
 	},
 	{
+		Wait:                   true,
 		URL:                    "https://store.steampowered.com/app/1282100/Remnant_II/",
 		Priority:               "Medium",
 		Status:                 "Playing",
@@ -99,12 +102,15 @@ func TestAddGameRoute(t *testing.T) {
 			t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
 		}
 
-		msg, exists := resMap["message"]
+		expectedMessage := "Game page created with success"
+		actualMessage, exists := resMap["message"]
 		if !exists {
 			t.Error(`Response body has no field "message"`)
 		}
-		if msg != "Job created with success" {
-			t.Error(`Field "message" in the response is not equal to "Job created with success"`)
+		if actualMessage != expectedMessage {
+			t.Errorf(`expected message: %s, actual message: %s`, expectedMessage, actualMessage)
 		}
+
+		t.Log(actualMessage)
 	}
 }

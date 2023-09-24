@@ -17,23 +17,21 @@ import (
 	"github.com/tebeka/selenium"
 )
 
-// State
 func AddGame(c *gin.Context) {
-	// Create the job
+	// Create and add job
 	currentJob := job.Job{
 		Task:      "Add game to Games Tracker database",
-		State:     "Starting",
 		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
 	}
 	currentJob.SetStartingState("Processing game request")
 
 	jobsList, ok := c.MustGet("JobsList").(*job.Jobs)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't create the task's job"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "couldn't create the task's job"})
 	}
 	jobsList.AddJob(&currentJob)
 
-	// Start the task
+	// Validate request
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("IsValidDate", IsValidDate)
 	}
@@ -42,61 +40,35 @@ func AddGame(c *gin.Context) {
 	if err := c.ShouldBindJSON(&gameRequest); err != nil {
 		err = fmt.Errorf("invalid JSON fields, refer to the API documentation")
 		currentJob.SetFailedState(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
 	err := SetStructDateFields(&gameRequest)
 	if err != nil {
 		currentJob.SetFailedState(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	configs, err := util.GetConfigs()
-	if err != nil {
-		currentJob.SetFailedState(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
 	// Get game info from a web store and create the game notion page
-	go func() {
-		currentJob.SetExecutingStateWithValue("Scraping game data", gameRequest.URL)
+	configs, err := util.GetConfigs()
+	if err != nil {
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
 
-		scrapedGameProperties, err, setErrorAsStateDescription := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
-		if err != nil {
-			if setErrorAsStateDescription {
-				currentJob.SetFailedState(err)
-				return
-			} else {
-				err = fmt.Errorf("couldn't get the game properties from site")
-				currentJob.SetFailedState(err)
-				return
-			}
-		}
-
-		currentJob.SetExecutingStateWithValue("Creating game page", scrapedGameProperties.Name)
-
-		gameProperties := mergeToGameProperties(&gameRequest, scrapedGameProperties)
-		_, notionPageURL, err, setErrorAsStateDescription := createGamePage(gameProperties, (*configs).Notion.GamesTracker.DBID)
-		if err != nil {
-			if setErrorAsStateDescription {
-				currentJob.SetFailedState(err)
-				return
-			} else {
-				err = fmt.Errorf("couldn't create the game page")
-				currentJob.SetFailedState(err)
-				return
-			}
-		}
-
-		currentJob.SetCompletedStateWithValue("Game page created", notionPageURL)
-	}()
-	c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
+	if !gameRequest.Wait {
+		go addGameTask(&currentJob, &gameRequest, configs, c, gameRequest.Wait)
+		c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
+	} else {
+		addGameTask(&currentJob, &gameRequest, configs, c, gameRequest.Wait)
+	}
 }
 
 type GameRequest struct {
+	Wait                   bool      `json:"wait" binding:"-"` // Wether the requester wants to wait for the task to be done before responding
 	URL                    string    `json:"url" binding:"required,http_url"`
 	Priority               string    `json:"priority" binding:"required"`
 	Status                 string    `json:"status" binding:"required"`
@@ -125,40 +97,53 @@ func (gr *GameRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
 	gr.FinishedDroppedDate = finishedDroppedDate
 }
 
-func mergeToGameProperties(gr *GameRequest, sgp *ScrapedGameProperties) *GameProperties {
-	return &GameProperties{
-		Name:                sgp.Name,
-		URL:                 gr.URL,
-		CoverURL:            sgp.CoverURL,
-		ReleaseDate:         sgp.ReleaseDate,
-		Tags:                sgp.Tags,
-		Developers:          sgp.Developers,
-		Publishers:          sgp.Publishers,
-		Priority:            gr.Priority,
-		Status:              gr.Status,
-		Stars:               gr.Stars,
-		PurchasedOrGamePass: gr.PurchasedGamePass,
-		StartedDate:         gr.StartedDate,
-		FinishedDroppedDate: gr.FinishedDroppedDate,
-		Commentary:          gr.Commentary,
-	}
-}
+func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Configs, c *gin.Context, wait bool) {
+	currentJob.SetExecutingStateWithValue("Scraping game data", gameRequest.URL)
 
-type GameProperties struct {
-	Name                string
-	URL                 string
-	CoverURL            string
-	ReleaseDate         time.Time
-	Tags                []string
-	Developers          []string
-	Publishers          []string
-	Priority            string
-	Status              string
-	Stars               int
-	PurchasedOrGamePass bool
-	StartedDate         time.Time
-	FinishedDroppedDate time.Time
-	Commentary          string
+	scrapedGameProperties, err, setErrorAsStateDescription := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
+	if err != nil {
+		if setErrorAsStateDescription {
+			currentJob.SetFailedState(err)
+			if wait {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			}
+			return
+		} else {
+			err = fmt.Errorf("couldn't get the game properties from site")
+			currentJob.SetFailedState(err)
+			if wait {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			}
+			return
+		}
+	}
+
+	currentJob.SetExecutingStateWithValue("Creating game page", scrapedGameProperties.Name)
+
+	gameProperties := mergeToGameProperties(gameRequest, scrapedGameProperties)
+	_, notionPageURL, err, setErrorAsStateDescription := createGamePage(gameProperties, (*configs).Notion.GamesTracker.DBID)
+	if err != nil {
+		if setErrorAsStateDescription {
+			currentJob.SetFailedState(err)
+			if wait {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			}
+			return
+		} else {
+			err = fmt.Errorf("couldn't create the game page")
+			currentJob.SetFailedState(err)
+			if wait {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			}
+			return
+		}
+	}
+
+	currentJob.SetCompletedStateWithValue("Game page created", notionPageURL)
+
+	if wait {
+		c.JSON(http.StatusOK, gin.H{"message": "Game page created with success"})
+	}
 }
 
 func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*ScrapedGameProperties, error, bool) {
@@ -248,10 +233,15 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 		return nil, err, false
 	}
 
-	steamLayout := "2 Jan, 2006"
-	releaseDate, err := time.Parse(steamLayout, releaseDateStr)
-	if err != nil {
-		return nil, err, false
+	var releaseDate time.Time
+	switch releaseDateStr {
+	case "To be announced":
+	default:
+		steamLayout := "2 Jan, 2006"
+		releaseDate, err = time.Parse(steamLayout, releaseDateStr)
+		if err != nil {
+			return nil, err, false
+		}
 	}
 
 	// Tags
@@ -287,7 +277,7 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 		return nil, err, false
 	}
 
-	gameProperties := ScrapedGameProperties{
+	scrapedGameProperties := ScrapedGameProperties{
 		Name:        gameName,
 		CoverURL:    coverURL,
 		ReleaseDate: releaseDate,
@@ -296,16 +286,7 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 		Tags:        tags,
 	}
 
-	return &gameProperties, nil, false
-}
-
-func gameNameCondition(wd selenium.WebDriver) (bool, error) {
-	_, err := wd.FindElement(selenium.ByXPATH, "//div[@id='appHubAppName']")
-	if err != nil {
-		return false, nil
-	}
-
-	return true, nil
+	return &scrapedGameProperties, nil, false
 }
 
 type ScrapedGameProperties struct {
@@ -315,6 +296,15 @@ type ScrapedGameProperties struct {
 	Tags        []string
 	Developers  []string
 	Publishers  []string
+}
+
+func gameNameCondition(wd selenium.WebDriver) (bool, error) {
+	_, err := wd.FindElement(selenium.ByXPATH, "//div[@id='appHubAppName']")
+	if err != nil {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func selectFromDropdown(wd *selenium.WebDriver, xpath, option string) error {
@@ -355,6 +345,42 @@ func getTextFromDisplayNoneElements(elems []selenium.WebElement, wd *selenium.We
 	}
 
 	return elemsText, nil
+}
+
+func mergeToGameProperties(gr *GameRequest, sgp *ScrapedGameProperties) *GameProperties {
+	return &GameProperties{
+		Name:                sgp.Name,
+		URL:                 gr.URL,
+		CoverURL:            sgp.CoverURL,
+		ReleaseDate:         sgp.ReleaseDate,
+		Tags:                sgp.Tags,
+		Developers:          sgp.Developers,
+		Publishers:          sgp.Publishers,
+		Priority:            gr.Priority,
+		Status:              gr.Status,
+		Stars:               gr.Stars,
+		PurchasedOrGamePass: gr.PurchasedGamePass,
+		StartedDate:         gr.StartedDate,
+		FinishedDroppedDate: gr.FinishedDroppedDate,
+		Commentary:          gr.Commentary,
+	}
+}
+
+type GameProperties struct {
+	Name                string
+	URL                 string
+	CoverURL            string
+	ReleaseDate         time.Time
+	Tags                []string
+	Developers          []string
+	Publishers          []string
+	Priority            string
+	Status              string
+	Stars               int
+	PurchasedOrGamePass bool
+	StartedDate         time.Time
+	FinishedDroppedDate time.Time
+	Commentary          string
 }
 
 func createGamePage(gp *GameProperties, DB_ID string) (notionapi.ObjectID, string, error, bool) {
@@ -422,7 +448,6 @@ func getGamePageRequest(gp *GameProperties, DB_ID string) *notionapi.PageCreateR
 }
 
 func getValidGameProperties(gp *GameProperties) *notionapi.Properties {
-	releaseDate := notionapi.Date(gp.ReleaseDate)
 	tags := transformIntoMultiSelect(&gp.Tags)
 	developers := transformIntoMultiSelect(&gp.Developers)
 	publishers := transformIntoMultiSelect(&gp.Publishers)
@@ -435,11 +460,6 @@ func getValidGameProperties(gp *GameProperties) *notionapi.Properties {
 		},
 		"Link": notionapi.URLProperty{
 			URL: gp.URL,
-		},
-		"Release date": notionapi.DateProperty{
-			Date: &notionapi.DateObject{
-				Start: &releaseDate,
-			},
 		},
 		"Tags": notionapi.MultiSelectProperty{
 			MultiSelect: *tags,
@@ -463,6 +483,17 @@ func getValidGameProperties(gp *GameProperties) *notionapi.Properties {
 		"Purchased/GamePass?": notionapi.CheckboxProperty{
 			Checkbox: gp.PurchasedOrGamePass,
 		},
+	}
+
+	// Release date (some games don't have)
+	var zeroTime time.Time
+	if !gp.ReleaseDate.Equal(zeroTime) {
+		releaseDate := notionapi.Date(gp.ReleaseDate)
+		gameProperties["Release date"] = notionapi.DateProperty{
+			Date: &notionapi.DateObject{
+				Start: &releaseDate,
+			},
+		}
 	}
 
 	// Optional properties
