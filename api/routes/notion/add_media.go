@@ -56,7 +56,7 @@ func AddMedia(c *gin.Context) {
 	configs, err := util.GetConfigs()
 	if err != nil {
 		currentJob.SetFailedState(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -64,16 +64,14 @@ func AddMedia(c *gin.Context) {
 	go func() {
 		currentJob.SetExecutingStateWithValue("Scraping media data", mediaRequest.URL)
 
-		scrapedMediaProperties, err, responseError := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
+		scrapedMediaProperties, err, setErrorAsStateDescription := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
 		if err != nil {
-			if responseError {
+			if setErrorAsStateDescription {
 				currentJob.SetFailedState(err)
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			} else {
 				err = fmt.Errorf("couldn't get the media properties from site")
 				currentJob.SetFailedState(err)
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
 		}
@@ -81,16 +79,14 @@ func AddMedia(c *gin.Context) {
 		currentJob.SetExecutingStateWithValue("Creating media page", scrapedMediaProperties.Name)
 
 		mediaProperties := mergeToMediaProperties(&mediaRequest, scrapedMediaProperties)
-		_, notionPageURL, err, responseError := createMediaPage(mediaProperties, (*configs).Notion.MediasTracker.DBID)
+		_, notionPageURL, err, setErrorAsStateDescription := createMediaPage(mediaProperties, (*configs).Notion.MediasTracker.DBID)
 		if err != nil {
-			if responseError {
+			if setErrorAsStateDescription {
 				currentJob.SetFailedState(err)
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			} else {
 				err = fmt.Errorf("couldn't create the media page")
 				currentJob.SetFailedState(err)
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
 		}

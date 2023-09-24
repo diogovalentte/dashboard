@@ -56,7 +56,7 @@ func AddGame(c *gin.Context) {
 	configs, err := util.GetConfigs()
 	if err != nil {
 		currentJob.SetFailedState(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -64,16 +64,14 @@ func AddGame(c *gin.Context) {
 	go func() {
 		currentJob.SetExecutingStateWithValue("Scraping game data", gameRequest.URL)
 
-		scrapedGameProperties, err, responseError := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
+		scrapedGameProperties, err, setErrorAsStateDescription := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
 		if err != nil {
-			if responseError {
+			if setErrorAsStateDescription {
 				currentJob.SetFailedState(err)
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			} else {
 				err = fmt.Errorf("couldn't get the game properties from site")
 				currentJob.SetFailedState(err)
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
 		}
@@ -81,16 +79,14 @@ func AddGame(c *gin.Context) {
 		currentJob.SetExecutingStateWithValue("Creating game page", scrapedGameProperties.Name)
 
 		gameProperties := mergeToGameProperties(&gameRequest, scrapedGameProperties)
-		_, notionPageURL, err, responseError := createGamePage(gameProperties, (*configs).Notion.GamesTracker.DBID)
+		_, notionPageURL, err, setErrorAsStateDescription := createGamePage(gameProperties, (*configs).Notion.GamesTracker.DBID)
 		if err != nil {
-			if responseError {
+			if setErrorAsStateDescription {
 				currentJob.SetFailedState(err)
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			} else {
 				err = fmt.Errorf("couldn't create the game page")
 				currentJob.SetFailedState(err)
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
 		}
