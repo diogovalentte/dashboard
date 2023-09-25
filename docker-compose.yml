@@ -1,17 +1,22 @@
 version: '3.8'
 
 services:
-  # api:
-  #   container_name: 'dashboard-api'
-  #   image: golang:1.19.3
-  #
-  #   working_dir: /dashboard-api
-  #   volumes:
-  #     - .:/dashboard-api
-  #   command: etc/docker/dashboard-api.sh
-  #
-  #   networks:
-  #     - dashboard-ntw
+  api:
+    container_name: 'dashboard-api'
+    image: golang:1.19.3
+
+    working_dir: /dashboard-api
+    volumes:
+      - .:/dashboard-api
+    command: etc/docker/dashboard-api.sh
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+    networks:
+      - dashboard-ntw
 
   dashboard:
     container_name: 'dashboard'
@@ -22,10 +27,15 @@ services:
       - .:/dashboard
     ports:
       - 8501:8501
-    command: etc/docker/api.sh
+    command: etc/docker/dashboard.sh
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8501/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-    # depends_on:
-    #   - api
+    depends_on:
+      - api
     networks:
       - dashboard-ntw
 
