@@ -2,20 +2,11 @@
 
 
 ## How to use:
-1. Download firefox into **/opt/firefox/**:
+1. Install [Docker](https://www.docker.com).
+2. Create the file **configs/configs.json** with some configs and credentials. This file should follow the structure of the **configs/configs.example.json** file.
+3. The dashboard uses the [Streamlit Authenticator](https://github.com/mkhorasani/Streamlit-Authenticator/tree/main) module, check [here](https://github.com/mkhorasani/Streamlit-Authenticator/tree/main#1-hashing-passwords) how to create the file **.streamlit/credentials/credentials.yaml** (should be at this location!) with the users/passwords used to login in the dashboard.
+4. Start the API and the dashboard in the background:
 ```
-curl -L -o /tmp/firefox-117.0.1.tar.bz2 "https://download.mozilla.org/?product=firefox-117.0.1&os=linux64&lang=en-US"
-tar -xvf /tmp/firefox-117.0.1.tar.bz2 -C /opt
+docker compose up -d
 ```
-2. Download geckodriver into **/opt/geckodriver/**:
-```
-curl -L -o /tmp/geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/download/v0.33.0/geckodriver-v0.33.0-linux64.tar.gz
-mkdir -p /opt/geckodriver/
-tar -xvf /tmp/geckodriver.tar.gz -C /opt/geckodriver/
-```
-3. Create the file **configs/configs.json** with some configs and credentials. This file should follow the structure of the **configs/configs.example.json** file.
-4. Build and start the API in a shell:
-```
-go build -o dashboard-api
-./dashboard-api
-```
+5. Access the dashboard at [http://localhost:8501](http://localhost:8501).
