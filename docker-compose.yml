@@ -11,9 +11,11 @@ services:
     command: etc/docker/dashboard-api.sh
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/v1/health || exit 1"]
-      interval: 10s
+      interval: 1m
       timeout: 5s
       retries: 3
+      start_period: 3m
+    restart: on-failure
 
     networks:
       - dashboard-ntw
@@ -33,9 +35,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    restart: on-failure
 
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       - dashboard-ntw
 
