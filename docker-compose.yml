@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # api:
+  #   container_name: 'dashboard-api'
+  #   image: golang:1.19.3
+  #
+  #   working_dir: /dashboard-api
+  #   volumes:
+  #     - .:/dashboard-api
+  #   command: etc/docker/dashboard-api.sh
+  #
+  #   networks:
+  #     - dashboard-ntw
+
+  dashboard:
+    container_name: 'dashboard'
+    image: python:3.10.12
+
+    working_dir: /dashboard
+    volumes:
+      - .:/dashboard
+    ports:
+      - 8501:8501
+    command: etc/docker/api.sh
+
+    # depends_on:
+    #   - api
+    networks:
+      - dashboard-ntw
+
+networks:
+  dashboard-ntw:
+    name: personal-dashboard

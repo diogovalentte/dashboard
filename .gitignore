@@ -4,7 +4,10 @@ requester.py
 __pycache__
 
 # Etc
-etc
+etc/*/
+!etc/docker
 dashboard-api
+.docker-python-venv
+
 configs.json
 credentials.yaml

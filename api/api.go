@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/diogovalentte/dashboard/api/job"
+	"github.com/diogovalentte/dashboard/api/routes/health_check"
 	"github.com/diogovalentte/dashboard/api/routes/jobs"
 	"github.com/diogovalentte/dashboard/api/routes/notion"
 	"github.com/gin-gonic/gin"
@@ -22,16 +23,21 @@ func SetupRouter() *gin.Engine {
 	router.Use(setRouterJobsList(jobsList))
 
 	v1 := router.Group("/v1")
+	// Health check route
+	{
+		health_check.HealthCheckRoute(v1)
+	}
+
+	// Jobs routes
+	jobsGroup := v1.Group("/jobs")
+	{
+		jobs.JobsRoutes(jobsGroup)
+	}
 	// Notion routes
 	notionGroup := v1.Group("/notion")
 	{
 		notion.GamesTrackerRoutes(notionGroup)
 		notion.MediasTrackerRoutes(notionGroup)
-	}
-	// Jobs routes
-	jobsGroup := v1.Group("/jobs")
-	{
-		jobs.JobsRoutes(jobsGroup)
 	}
 
 	return router
