@@ -3,10 +3,19 @@ import streamlit as st
 from dashboard.api.client import (GameProperties, MediaProperties,
                                   get_api_client)
 
+st.set_page_config(
+    page_title="Notion",
+    page_icon="📝",
+    layout="wide",
+)
+
 
 class NotionPage:
     def __init__(self) -> None:
         self.api_client = get_api_client()
+
+    def sidebar(self):
+        self.api_client.show_all_jobs_updating()
 
     def show(self):
         st.header("Notion")
@@ -19,6 +28,8 @@ class NotionPage:
 
         with media_tracker_tab:
             self.medias_tracker_tab()
+
+        self.sidebar()
 
     def games_tracker_tab(self):
         st.header("Add a game")
@@ -242,3 +253,7 @@ class NotionPage:
                 self.api_client.add_media(media_properties)
 
                 st.success("Requested media page")
+
+
+page = NotionPage()
+page.show()
