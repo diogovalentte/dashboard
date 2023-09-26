@@ -6,6 +6,7 @@ __pycache__
 # Etc
 etc/*/
 !etc/docker
+!etc/nginx
 dashboard-api
 .docker-python-venv
 
