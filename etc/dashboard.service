@@ -1,0 +1,17 @@
+[Unit]
+Description=Personal Dashboard
+After=network.target
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/projects/github.com/diogovalentte/dashboard/
+ExecStart=/usr/bin/docker compose up
+ExecReload=/usr/bin/docker compose down && /ust/bin/docker compose up
+ExecStop=/usr/bin/docker compose down
+Restart=on-failure
+StandardOutput=file:/var/log/dashboard.log
+StandardError=file:/var/log/dashboard.log
+
+[Install]
+WantedBy=multi-user.target
