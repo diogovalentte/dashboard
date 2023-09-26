@@ -9,7 +9,9 @@ from streamlit.source_util import (_on_pages_changed, calc_md5, get_pages,
 from streamlit_authenticator import Authenticate
 
 MAIN_SCRIPT_PATH = "01_🏠_Main_Page.py"
-LOGGED_PAGES = ("02_📝_Notion_Page.py",)
+LOGGED_PAGES = {
+    "02_📝_Notion_Page.py": "Notion_Page"
+}  # Keys are used by the add_page() and the values are used by the remove_page()
 
 
 def remove_page(main_script_path: str, page_name: str):
@@ -18,8 +20,8 @@ def remove_page(main_script_path: str, page_name: str):
     Args:
         main_script_path (str): The name of the file used to run the app, like "streamlit run main_script.py".
         page_name (str): The name of the page to hide/remove.
+            - If the filename is like "03_😊_Page_Name.py", the page name needed is only "Page_Name".
     """
-    page_name = page_name.replace(".py", "")
     current_pages = get_pages(main_script_path)
 
     for key, value in current_pages.items():
@@ -32,7 +34,7 @@ def remove_page(main_script_path: str, page_name: str):
 
 
 def hide_logged_pages():
-    for page in LOGGED_PAGES:
+    for page in LOGGED_PAGES.values():
         remove_page(MAIN_SCRIPT_PATH, page)
 
 
@@ -63,7 +65,7 @@ def add_page(main_script_path: str, page_file_name: str):
 
 
 def show_logged_pages():
-    for page in LOGGED_PAGES:
+    for page in LOGGED_PAGES.keys():
         add_page(MAIN_SCRIPT_PATH, page)
 
 
