@@ -147,3 +147,10 @@ func (jobs *Jobs) GetJobs() []*Job {
 
 	return jobs.Jobs
 }
+
+func (jobs *Jobs) DeleteAllJobs() {
+	jobs.mutex.Lock()
+	defer jobs.mutex.Unlock()
+
+	jobs.Jobs = []*Job{}
+}
