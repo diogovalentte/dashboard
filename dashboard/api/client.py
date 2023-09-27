@@ -100,56 +100,39 @@ class MediaProperties(JSONBody):
         return self.media_properties
 
 
-class APIClient:
-    def __init__(self, base_URL: str, port: int) -> None:
-        self.base_url = f"{base_URL}:{port}"
-        self.acceptable_status_codes = (200, 400)
+class JobsAPIClient:
+    def __init__(self) -> None:
+        self.base_url: str = ""
 
-    def add_game(self, game_properties: GameProperties) -> None:
-        path = "/v1/notion/games_tracker/add_game"
-        url = urljoin(self.base_url, path)
-
-        res = requests.post(url, json=game_properties.json)
-
-        if res.status_code not in self.acceptable_status_codes:
-            raise APIException(
-                "error while adding game to games tracker database",
-                url,
-                "POST",
-                res.status_code,
-                res.text,
-            )
-
-    def add_media(self, media_properties: MediaProperties) -> None:
-        path = "/v1/notion/medias_tracker/add_media"
-        url = urljoin(self.base_url, path)
-
-        res = requests.post(url, json=media_properties.json)
-
-        if res.status_code not in self.acceptable_status_codes:
-            raise APIException(
-                "error while adding media to medias tracker database",
-                url,
-                "POST",
-                res.status_code,
-                res.text,
-            )
-
-    def get_all_jobs(self) -> list:
+    def get_all_jobs(self):
         path = "/v1/jobs/get_all"
         url = urljoin(self.base_url, path)
 
         res = requests.get(url)
         if res.status_code != 200:
             raise APIException(
-                "error while adding game to games tracker database",
+                "error while getting all jobs from the API",
                 url,
-                "POST",
+                "GET",
                 res.status_code,
                 res.text,
             )
 
         return res.json().get("jobs", [])
+
+    def delete_all_jobs(self):
+        path = "/v1/jobs/delete_all"
+        url = urljoin(self.base_url, path)
+
+        res = requests.delete(url)
+        if res.status_code != 200:
+            raise APIException(
+                "error while deleting all jobs of the API",
+                url,
+                "DELETE",
+                res.status_code,
+                res.text,
+            )
 
     def show_all_jobs(self, jobs_placeholder: st.delta_generator.DeltaGenerator):
         jobs = self.get_all_jobs()
@@ -202,3 +185,45 @@ class APIClient:
         while True:
             self.show_all_jobs(jobs_placeholder)
             time.sleep(seconds)
+
+
+class NotionAPIClient:
+    def __init__(self) -> None:
+        self.base_url: str = ""
+        self.acceptable_status_codes: tuple = ()
+
+    def add_game(self, game_properties: GameProperties) -> None:
+        path = "/v1/notion/games_tracker/add_game"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json=game_properties.json)
+
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while adding game to games tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
+    def add_media(self, media_properties: MediaProperties) -> None:
+        path = "/v1/notion/medias_tracker/add_media"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json=media_properties.json)
+
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while adding media to medias tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
+
+class APIClient(JobsAPIClient, NotionAPIClient):
+    def __init__(self, base_URL: str, port: int) -> None:
+        self.base_url = f"{base_URL}:{port}"
+        self.acceptable_status_codes = (200, 400)
