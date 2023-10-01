@@ -101,43 +101,27 @@ func (mr *MediaRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
 func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util.Configs, c *gin.Context, wait bool) {
 	currentJob.SetExecutingStateWithValue("Scraping media data", mediaRequest.URL)
 
-	scrapedMediaProperties, err, setErrorAsStateDescription := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
+	scrapedMediaProperties, err := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
 	if err != nil {
-		if setErrorAsStateDescription {
-			currentJob.SetFailedState(err)
-			if wait {
-				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			}
-			return
-		} else {
-			err = fmt.Errorf("couldn't get the media properties from site")
-			currentJob.SetFailedState(err)
-			if wait {
-				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			}
-			return
+		err = fmt.Errorf("couldn't get the media properties from site")
+		currentJob.SetFailedState(err)
+		if wait {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		}
+		return
 	}
 
 	currentJob.SetExecutingStateWithValue("Creating media page", scrapedMediaProperties.Name)
 
 	mediaProperties := mergeToMediaProperties(mediaRequest, scrapedMediaProperties)
-	_, notionPageURL, err, setErrorAsStateDescription := createMediaPage(mediaProperties, (*configs).Notion.MediasTracker.DBID)
+	_, notionPageURL, err := createMediaPage(mediaProperties, (*configs).Notion.MediasTracker.DBID)
 	if err != nil {
-		if setErrorAsStateDescription {
-			currentJob.SetFailedState(err)
-			if wait {
-				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			}
-			return
-		} else {
-			err = fmt.Errorf("couldn't create the media page")
-			currentJob.SetFailedState(err)
-			if wait {
-				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			}
-			return
+		err = fmt.Errorf("couldn't create the media page")
+		currentJob.SetFailedState(err)
+		if wait {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		}
+		return
 	}
 
 	currentJob.SetCompletedStateWithValue("Media page created", notionPageURL)
@@ -147,45 +131,45 @@ func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util
 	}
 }
 
-func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (*ScrapedMediaProperties, error, bool) {
+func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (*ScrapedMediaProperties, error) {
 	// Gets media metadata from a media site (IMDB)
 	mediaURL = strings.SplitN(mediaURL, "?", 2)[0]
 	IMDB_Prefix := "https://www.imdb.com/title/"
 	if isIMDB_URL := strings.HasPrefix(mediaURL, IMDB_Prefix); !isIMDB_URL {
-		return nil, fmt.Errorf("the media url %s is not a valid IMDB url, it should start with: %s", mediaURL, IMDB_Prefix), true
+		return nil, fmt.Errorf("the media url %s is not a valid IMDB url, it should start with: %s", mediaURL, IMDB_Prefix)
 	}
 
 	wd, err := scraping.GetWebDriver(firefoxPath, geckoDriverServerPort)
 	if err != nil {
-		return nil, err, false
+		return nil, err
 	}
 	defer wd.Close()
 
 	// Get the media properties
 	if err := wd.Get(mediaURL); err != nil {
-		return nil, fmt.Errorf("could not get the page with URL: %s", mediaURL), true
+		return nil, fmt.Errorf("could not get the page with URL: %s", mediaURL)
 	}
 
 	timeout := 10 * time.Second
 	err = wd.WaitWithTimeout(mediaNameCondition, timeout)
 	if err != nil {
-		return nil, fmt.Errorf("timeout while waiting for page to load"), true
+		return nil, fmt.Errorf("timeout while waiting for page to load")
 	}
 
 	// Name
 	mediaNameElem, err := wd.FindElement(selenium.ByXPATH, "//h1[@data-testid='hero__pageTitle']")
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
 	mediaName, err := mediaNameElem.Text()
 	if err != nil {
-		return nil, err, false
+		return nil, err
 	}
 
 	// Cover URL
 	coverURLElem, err := wd.FindElement(selenium.ByXPATH, "//*[contains(@class, 'ipc-media--poster-l')]//img[@class='ipc-image']")
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
 	coverURL, err := coverURLElem.GetAttribute("src")
 	if err != nil {
@@ -195,38 +179,38 @@ func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (
 	// Release date
 	releaseDateElem, err := wd.FindElement(selenium.ByXPATH, "//a[text()='Release date']/..//ul/li/a")
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
 	releaseDateStr, err := releaseDateElem.Text()
 	if err != nil {
-		return nil, err, false
+		return nil, err
 	}
 
 	releaseDateStr = strings.SplitN(releaseDateStr, " (", 2)[0]
 	steamLayout := "January 2, 2006"
 	releaseDate, err := time.Parse(steamLayout, releaseDateStr)
 	if err != nil {
-		return nil, err, false
+		return nil, err
 	}
 
 	// Genres
 	genreElems, err := wd.FindElements(selenium.ByXPATH, "(//div[@class='ipc-chip-list__scroller'])[1]/a")
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
 	genres, err := getTextFromElements(genreElems)
 	if err != nil {
-		return nil, err, false
+		return nil, err
 	}
 
 	// Staff
 	staffElems, err := wd.FindElements(selenium.ByXPATH, "(//ul[@class='ipc-metadata-list ipc-metadata-list--dividers-all title-pc-list ipc-metadata-list--baseAlt'])[1]/li//li/a")
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
 	staff, err := getTextFromElements(staffElems)
 	if err != nil {
-		return nil, err, false
+		return nil, err
 	}
 
 	scrapedMediaProperties := ScrapedMediaProperties{
@@ -237,7 +221,7 @@ func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (
 		Staff:       staff,
 	}
 
-	return &scrapedMediaProperties, nil, false
+	return &scrapedMediaProperties, nil
 }
 
 type ScrapedMediaProperties struct {
@@ -291,17 +275,17 @@ type MediaProperties struct {
 	Commentary          string
 }
 
-func createMediaPage(mp *MediaProperties, DB_ID string) (notionapi.ObjectID, string, error, bool) {
+func createMediaPage(mp *MediaProperties, DB_ID string) (notionapi.ObjectID, string, error) {
 	pageCreateRequest := getMediaPageRequest(mp, DB_ID)
 
 	client, err := GetNotionClient()
 	if err != nil {
-		return "", "", err, false
+		return "", "", err
 	}
 
 	page, err := client.Page.Create(context.Background(), pageCreateRequest)
 	if err != nil {
-		return "", "", err, false
+		return "", "", err
 	}
 
 	// Add commentary
@@ -329,13 +313,13 @@ func createMediaPage(mp *MediaProperties, DB_ID string) (notionapi.ObjectID, str
 		if err != nil {
 			_, archivePageErr := ArchivePage(page.ID.String())
 			if archivePageErr != nil {
-				return "", "", fmt.Errorf("couldn't add commentary to the media page because of the error: %s. Also tried to archive the page, but an error occuried: %s", err, archivePageErr), false
+				return "", "", fmt.Errorf("couldn't add commentary to the media page because of the error: %s. Also tried to archive the page, but an error occuried: %s", err, archivePageErr)
 			}
-			return "", "", fmt.Errorf("couldn't add commentary to the media page because of the error: %s", err), false
+			return "", "", fmt.Errorf("couldn't add commentary to the media page because of the error: %s", err)
 		}
 	}
 
-	return page.ID, page.URL, nil, false
+	return page.ID, page.URL, nil
 }
 
 func getMediaPageRequest(mp *MediaProperties, DB_ID string) *notionapi.PageCreateRequest {
