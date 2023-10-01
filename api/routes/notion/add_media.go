@@ -173,7 +173,7 @@ func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (
 	}
 	coverURL, err := coverURLElem.GetAttribute("src")
 	if err != nil {
-		return nil, err, false
+		return nil, err
 	}
 
 	// Release date
