@@ -1,17 +1,18 @@
 [Unit]
 Description=Personal Dashboard
-After=network.target
+After=dashboard-api.service
 
 [Service]
 User=ubuntu
 Group=www-data
 WorkingDirectory=/home/ubuntu/projects/github.com/diogovalentte/dashboard/
-ExecStart=/usr/bin/docker compose up
-ExecReload=/usr/bin/docker compose down && /ust/bin/docker compose up
-ExecStop=/usr/bin/docker compose down
+ExecStart=/home/ubuntu/projects/github.com/diogovalentte/dashboard/.venv/bin/streamlit run /home/ubuntu/projects/github.com/diogovalentte/dashboard/01_🏠_Main_Page.py
 Restart=on-failure
 StandardOutput=file:/var/log/dashboard.log
 StandardError=file:/var/log/dashboard.log
+SystemMaxUse=100M
+SystemKeepFree=50M
+SystemMaxFiles=3
 
 [Install]
 WantedBy=multi-user.target

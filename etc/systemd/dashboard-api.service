@@ -1,0 +1,18 @@
+[Unit]
+Description=Personal Dashboard API
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/projects/github.com/diogovalentte/dashboard/
+ExecStart=go run /home/ubuntu/projects/github.com/diogovalentte/dashboard/main.go
+Restart=on-failure
+StandardOutput=file:/var/log/dashboard-api.log
+StandardError=file:/var/log/dashboard-api.log
+SystemMaxUse=100M
+SystemKeepFree=50M
+SystemMaxFiles=3
+
+[Install]
+WantedBy=multi-user.target

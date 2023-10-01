@@ -17,7 +17,7 @@ def get_api_client():
         logger.info("Defining the API client...")
 
         api_client = APIClient(
-            "http://dashboard-api", 8080
+            "http://localhost", 8080
         )  # The golang API docker service name
         st.session_state["api_client"] = api_client
 

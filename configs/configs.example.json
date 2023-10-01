@@ -1,6 +1,6 @@
 {
   "geckodriver": {
-    "binary_path": "/dashboard-api/etc/geckodriver/geckodriver", # don't change
+    "binary_path": "/opt/geckodriver/geckodriver", # don't change
     "port": 4444 # don't change
   },
   "firefox": {
