@@ -233,7 +233,7 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 	var tags []string
 	tagsElems, err := wd.FindElements(selenium.ByXPATH, "//div[contains(@class, 'glance_tags popular_tags')]/a")
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find an element in the page: %s", err), false
+		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
 	tags, err = getTextFromDisplayNoneElements(tagsElems, &wd)
 	if err != nil {
