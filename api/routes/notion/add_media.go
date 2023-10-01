@@ -27,7 +27,7 @@ func AddMedia(c *gin.Context) {
 
 	jobsList, ok := c.MustGet("JobsList").(*job.Jobs)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't create the task's job"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "couldn't create the task's job"})
 	}
 	jobsList.AddJob(&currentJob)
 
@@ -40,14 +40,14 @@ func AddMedia(c *gin.Context) {
 	if err := c.ShouldBindJSON(&mediaRequest); err != nil {
 		err = fmt.Errorf("invalid JSON fields, refer to the API documentation")
 		currentJob.SetFailedState(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
 	err := SetStructDateFields(&mediaRequest)
 	if err != nil {
 		currentJob.SetFailedState(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
@@ -55,11 +55,11 @@ func AddMedia(c *gin.Context) {
 	configs, err := util.GetConfigs()
 	if err != nil {
 		currentJob.SetFailedState(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	// Get media info from a web store and create the media notion page
+	// Get media info from a web site and create the media notion page
 	if !mediaRequest.Wait {
 		go addMediaTask(&currentJob, &mediaRequest, configs, c, mediaRequest.Wait)
 		c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
