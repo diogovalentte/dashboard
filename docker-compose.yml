@@ -9,10 +9,17 @@ services:
     restart: on-failure
     networks:
       - dashboard-ntw
+    deploy:
+      resources:
+        limits:
+          memory: 250M
+          cpus: '0.3'
+        reservations:
+          memory: 250M
 
   dashboard-api:
     container_name: 'dashboard-api'
-    image: accetto/ubuntu-vnc-xfce-firefox-g3
+    image: diogovalentte/personal-dashboard:1.0.0
 
     working_dir: /dashboard-api
     volumes:
@@ -30,6 +37,13 @@ services:
       - dashboard-geckodriver
     networks:
       - dashboard-ntw
+    deploy:
+      resources:
+        limits:
+          memory: 250M
+          cpus: '0.4'
+        reservations:
+          memory: 250M
 
   dashboard:
     container_name: 'dashboard'
@@ -52,6 +66,13 @@ services:
         condition: service_healthy
     networks:
       - dashboard-ntw
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+          cpus: '0.3'
+        reservations:
+          memory: 200M
 
 networks:
   dashboard-ntw:
