@@ -16,8 +16,12 @@ class MaintenancePage:
 
     def sidebar(self):
         self.create_service_status_widget("Dashboard", "http://localhost:8501/healthz")
-        self.create_service_status_widget("Backend API", "http://api:8080/v1/health")
-        self.create_service_status_widget("Geckodriver", "http://api:8085/status")
+        self.create_service_status_widget(
+            "Backend API", "http://dashboard-api:8080/v1/health"
+        )
+        self.create_service_status_widget(
+            "Geckodriver", "http://dashboard-geckodriver:4444/status"
+        )
 
         st.sidebar.divider()
 
