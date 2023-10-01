@@ -103,7 +103,6 @@ func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Co
 
 	scrapedGameProperties, err := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
 	if err != nil {
-		err = fmt.Errorf("couldn't get the game properties from site")
 		currentJob.SetFailedState(err)
 		if wait {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -116,7 +115,6 @@ func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Co
 	gameProperties := mergeToGameProperties(gameRequest, scrapedGameProperties)
 	_, notionPageURL, err := createGamePage(gameProperties, (*configs).Notion.GamesTracker.DBID)
 	if err != nil {
-		err = fmt.Errorf("couldn't create the game page")
 		currentJob.SetFailedState(err)
 		if wait {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})

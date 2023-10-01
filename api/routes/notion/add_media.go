@@ -103,7 +103,6 @@ func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util
 
 	scrapedMediaProperties, err := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
 	if err != nil {
-		err = fmt.Errorf("couldn't get the media properties from site")
 		currentJob.SetFailedState(err)
 		if wait {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -116,7 +115,6 @@ func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util
 	mediaProperties := mergeToMediaProperties(mediaRequest, scrapedMediaProperties)
 	_, notionPageURL, err := createMediaPage(mediaProperties, (*configs).Notion.MediasTracker.DBID)
 	if err != nil {
-		err = fmt.Errorf("couldn't create the media page")
 		currentJob.SetFailedState(err)
 		if wait {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
