@@ -4,7 +4,7 @@
     "port": 4444 # don't change
   },
   "firefox": {
-    "binary_path": "/opt/firefox/firefox" # don't change
+    "binary_path": "/usr/bin/firefox"
   },
   "notion": {
     "token": "",
