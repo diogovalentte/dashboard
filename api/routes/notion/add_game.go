@@ -145,7 +145,7 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 
 	// Get the game properties
 	if err := wd.Get(gameURL); err != nil {
-		return nil, fmt.Errorf("could not get the page with URL: %s", gameURL)
+		return nil, fmt.Errorf("could not get the page with URL: %s. Error: %s", gameURL, err)
 	}
 
 	timeout := 10 * time.Second

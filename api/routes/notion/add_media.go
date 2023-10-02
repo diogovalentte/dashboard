@@ -145,7 +145,7 @@ func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (
 
 	// Get the media properties
 	if err := wd.Get(mediaURL); err != nil {
-		return nil, fmt.Errorf("could not get the page with URL: %s", mediaURL)
+		return nil, fmt.Errorf("could not get the page with URL: %s. Error: %s", mediaURL, err)
 	}
 
 	timeout := 10 * time.Second
