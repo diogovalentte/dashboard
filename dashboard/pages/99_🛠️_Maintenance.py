@@ -58,14 +58,14 @@ class MaintenancePage:
             st.sidebar.metric(
                 label="Health status",
                 value=service_name,
-                delta="Health",
+                delta="Healthy",
                 label_visibility="collapsed",
             )
         else:
             st.sidebar.metric(
                 label="Health status",
                 value=service_name,
-                delta="-Unhealth",
+                delta="-Unhealthy",
                 label_visibility="collapsed",
             )
 
