@@ -10,7 +10,8 @@ from streamlit_authenticator import Authenticate
 
 MAIN_SCRIPT_PATH = "01_🏠_Main_Page.py"
 LOGGED_PAGES = {
-    "02_📝_Notion_Page.py": "Notion_Page",
+    "02_🕹️_Games_Tracker.py": "Games_Tracker",
+    "03_📺_Media_Tracker.py": "Media_Tracker",
     "99_🛠️_Maintenance.py": "Maintenance",
 }  # Keys are used by the add_page() and the values are used by the remove_page()
 
