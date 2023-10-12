@@ -15,4 +15,4 @@ configs.json
 credentials.yaml
 
 # Data
-data/*
+*.db
