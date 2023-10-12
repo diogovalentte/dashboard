@@ -1,16 +1,18 @@
 package notion
 
 import (
-	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/diogovalentte/dashboard/api/job"
 	"github.com/diogovalentte/dashboard/api/scraping"
 	"github.com/diogovalentte/dashboard/api/util"
-	"github.com/diogovalentte/notionapi"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -52,7 +54,7 @@ func AddGame(c *gin.Context) {
 	}
 
 	// Get game info from a web store and create the game notion page
-	configs, err := util.GetConfigs()
+	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
 		currentJob.SetFailedState(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -110,10 +112,18 @@ func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Co
 		return
 	}
 
-	currentJob.SetExecutingStateWithValue("Creating game page", scrapedGameProperties.Name)
+	currentJob.SetExecutingStateWithValue("Adding game to DB", scrapedGameProperties.Name)
 
-	gameProperties := mergeToGameProperties(gameRequest, scrapedGameProperties)
-	_, notionPageURL, err := createGamePage(gameProperties, (*configs).Notion.GamesTracker.DBID)
+	gameProperties, err := getGameProperties(gameRequest, scrapedGameProperties)
+	if err != nil {
+		currentJob.SetFailedState(err)
+		if wait {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		}
+		return
+	}
+	// _, notionPageURL, err := createGamePage(gameProperties, (*configs).Notion.GamesTracker.DBID)
+	err = insertGameToDB(gameProperties)
 	if err != nil {
 		currentJob.SetFailedState(err)
 		if wait {
@@ -122,7 +132,7 @@ func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Co
 		return
 	}
 
-	currentJob.SetCompletedStateWithValue("Game page created", notionPageURL)
+	currentJob.SetCompletedState("Game inserted into DB")
 
 	if wait {
 		c.JSON(http.StatusOK, gin.H{"message": "Game page created with success"})
@@ -207,23 +217,26 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 	}
 
 	// Release date
+	var releaseDate time.Time
 	releaseDateElem, err := wd.FindElement(selenium.ByXPATH, "//div[@class='release_date']/div[@class='date']")
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
-	}
-	releaseDateStr, err := releaseDateElem.Text()
-	if err != nil {
-		return nil, err
-	}
-
-	var releaseDate time.Time
-	switch releaseDateStr {
-	case "To be announced":
-	default:
-		steamLayout := "2 Jan, 2006"
-		releaseDate, err = time.Parse(steamLayout, releaseDateStr)
+		if err.Error() != "no such element: Unable to locate element: //div[@class='release_date']/div[@class='date']" {
+			return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
+		}
+	} else {
+		releaseDateStr, err := releaseDateElem.Text()
 		if err != nil {
 			return nil, err
+		}
+
+		switch releaseDateStr {
+		case "To be announced":
+		default:
+			steamLayout := "2 Jan, 2006"
+			releaseDate, err = time.Parse(steamLayout, releaseDateStr)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -330,15 +343,24 @@ func getTextFromDisplayNoneElements(elems []selenium.WebElement, wd *selenium.We
 	return elemsText, nil
 }
 
-func mergeToGameProperties(gr *GameRequest, sgp *ScrapedGameProperties) *GameProperties {
+func getGameProperties(gr *GameRequest, sgp *ScrapedGameProperties) (*GameProperties, error) {
+	coverImg, err := util.GetImageFromURL(sgp.CoverURL)
+	if err != nil {
+		return nil, err
+	}
+
+	tags := strings.Join(sgp.Tags, ",")
+	developers := strings.Join(sgp.Developers, ",")
+	publishers := strings.Join(sgp.Publishers, ",")
+
 	return &GameProperties{
 		Name:                sgp.Name,
 		URL:                 gr.URL,
-		CoverURL:            sgp.CoverURL,
+		CoverImg:            coverImg,
 		ReleaseDate:         sgp.ReleaseDate,
-		Tags:                sgp.Tags,
-		Developers:          sgp.Developers,
-		Publishers:          sgp.Publishers,
+		TagsStr:             tags,
+		DevelopersStr:       developers,
+		PublishersStr:       publishers,
 		Priority:            gr.Priority,
 		Status:              gr.Status,
 		Stars:               gr.Stars,
@@ -346,16 +368,19 @@ func mergeToGameProperties(gr *GameRequest, sgp *ScrapedGameProperties) *GamePro
 		StartedDate:         gr.StartedDate,
 		FinishedDroppedDate: gr.FinishedDroppedDate,
 		Commentary:          gr.Commentary,
-	}
+	}, nil
 }
 
 type GameProperties struct {
 	Name                string
 	URL                 string
-	CoverURL            string
+	CoverImg            []byte
 	ReleaseDate         time.Time
+	TagsStr             string
 	Tags                []string
+	DevelopersStr       string
 	Developers          []string
+	PublishersStr       string
 	Publishers          []string
 	Priority            string
 	Status              string
@@ -366,146 +391,52 @@ type GameProperties struct {
 	Commentary          string
 }
 
-func createGamePage(gp *GameProperties, DB_ID string) (notionapi.ObjectID, string, error) {
-	pageCreateRequest := getGamePageRequest(gp, DB_ID)
-
-	client, err := GetNotionClient()
+func insertGameToDB(gp *GameProperties) error {
+	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
-		return "", "", err
+		return err
 	}
+	dbPath := filepath.Join(configs.Database.FolderPath, "trackers.db")
 
-	page, err := client.Page.Create(context.Background(), pageCreateRequest)
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		return "", "", err
+		return err
+	}
+	defer db.Close()
+
+	stm, err := db.Prepare(`
+INSERT INTO games_tracker (
+  url, name, cover_img, release_date, tags, developers, publishers, priority,
+  status, stars, purchased_or_gamepass, started_date, finished_dropped_date, commentary
+)
+VALUES (
+  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+)
+  `)
+	if err != nil {
+		return err
+	}
+	defer stm.Close()
+
+	_, err = stm.Exec(
+		gp.URL,
+		gp.Name,
+		gp.CoverImg,
+		gp.ReleaseDate,
+		gp.TagsStr,
+		gp.DevelopersStr,
+		gp.PublishersStr,
+		gp.Priority,
+		gp.Status,
+		gp.Stars,
+		gp.PurchasedOrGamePass,
+		gp.StartedDate,
+		gp.FinishedDroppedDate,
+		gp.Commentary,
+	)
+	if err != nil {
+		return err
 	}
 
-	// Add commentary
-	if gp.Commentary != "" {
-		_, err = client.Block.AppendChildren(context.Background(), notionapi.BlockID(page.ID), &notionapi.AppendBlockChildrenRequest{
-			Children: []notionapi.Block{
-				notionapi.QuoteBlock{
-					BasicBlock: notionapi.BasicBlock{
-						Type:   notionapi.BlockType("quote"),
-						Object: notionapi.ObjectType("block"),
-					},
-					Quote: notionapi.Quote{
-						RichText: []notionapi.RichText{
-							{
-								Type: notionapi.ObjectType("text"),
-								Text: &notionapi.Text{
-									Content: gp.Commentary,
-								},
-							},
-						},
-					},
-				},
-			},
-		})
-		if err != nil {
-			_, archivePageErr := ArchivePage(page.ID.String())
-			if archivePageErr != nil {
-				return "", "", fmt.Errorf("couldn't add commentary to the game page because of the error: %s. Also tried to archive the page, but an error occuried: %s", err, archivePageErr)
-			}
-			return "", "", fmt.Errorf("couldn't add commentary to the game page because of the error: %s", err)
-		}
-	}
-
-	return page.ID, page.URL, nil
-}
-
-func getGamePageRequest(gp *GameProperties, DB_ID string) *notionapi.PageCreateRequest {
-	validProperties := getValidGameProperties(gp)
-
-	pageCreateRequest := &notionapi.PageCreateRequest{
-		Parent: notionapi.Parent{
-			DatabaseID: notionapi.DatabaseID(DB_ID),
-		},
-		Cover: &notionapi.Image{
-			Type:     "external",
-			External: &notionapi.FileObject{URL: gp.CoverURL},
-		},
-		Properties: *validProperties,
-	}
-
-	return pageCreateRequest
-}
-
-func getValidGameProperties(gp *GameProperties) *notionapi.Properties {
-	tags := transformIntoMultiSelect(&gp.Tags)
-	developers := transformIntoMultiSelect(&gp.Developers)
-	publishers := transformIntoMultiSelect(&gp.Publishers)
-
-	gameProperties := notionapi.Properties{
-		"Name": notionapi.TitleProperty{
-			Title: []notionapi.RichText{
-				{Text: &notionapi.Text{Content: gp.Name}},
-			},
-		},
-		"Link": notionapi.URLProperty{
-			URL: gp.URL,
-		},
-		"Tags": notionapi.MultiSelectProperty{
-			MultiSelect: *tags,
-		},
-		"Developers": notionapi.MultiSelectProperty{
-			MultiSelect: *developers,
-		},
-		"Publishers": notionapi.MultiSelectProperty{
-			MultiSelect: *publishers,
-		},
-		"Priority": notionapi.SelectProperty{
-			Select: notionapi.Option{
-				Name: gp.Priority,
-			},
-		},
-		"Status": notionapi.StatusProperty{
-			Status: notionapi.Option{
-				Name: gp.Status,
-			},
-		},
-		"Purchased/GamePass?": notionapi.CheckboxProperty{
-			Checkbox: gp.PurchasedOrGamePass,
-		},
-	}
-
-	// Release date (some games don't have)
-	var zeroTime time.Time
-	if !gp.ReleaseDate.Equal(zeroTime) {
-		releaseDate := notionapi.Date(gp.ReleaseDate)
-		gameProperties["Release date"] = notionapi.DateProperty{
-			Date: &notionapi.DateObject{
-				Start: &releaseDate,
-			},
-		}
-	}
-
-	// Optional properties
-	if gp.Stars != 0 {
-		stars := getStarsEmojis(gp.Stars)
-		gameProperties["Stars"] = notionapi.SelectProperty{
-			Select: notionapi.Option{
-				Name: stars,
-			},
-		}
-	}
-
-	if !gp.StartedDate.IsZero() {
-		startedDate := notionapi.Date(gp.StartedDate)
-		gameProperties["Started date"] = notionapi.DateProperty{
-			Date: &notionapi.DateObject{
-				Start: &startedDate,
-			},
-		}
-	}
-
-	if !gp.FinishedDroppedDate.IsZero() {
-		finishedDroppedDate := notionapi.Date(gp.FinishedDroppedDate)
-		gameProperties["Finished/Dropped date"] = notionapi.DateProperty{
-			Date: &notionapi.DateObject{
-				Start: &finishedDroppedDate,
-			},
-		}
-	}
-
-	return &gameProperties
+	return nil
 }

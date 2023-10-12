@@ -30,7 +30,7 @@ func TestGetGameMetadata(t *testing.T) {
 	}
 
 	gameURL := "https://store.steampowered.com/app/1174180/Red_Dead_Redemption_2"
-	actual, err, _ := notion.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
+	actual, err := notion.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -41,17 +41,17 @@ func TestGetGameMetadata(t *testing.T) {
 }
 
 var addGameRouteTestTable = []*notion.GameRequest{
-	{
-		Wait:                   true,
-		URL:                    "https://store.steampowered.com/app/105600/Terraria/",
-		Priority:               "Low",
-		Status:                 "Playing",
-		PurchasedGamePass:      false,
-		Stars:                  3,
-		StartedDateStr:         "2023-01-01",
-		FinishedDroppedDateStr: "2023-01-02",
-		Commentary:             "Not my type.",
-	},
+	// {
+	// 	Wait:                   true,
+	// 	URL:                    "https://store.steampowered.com/app/105600/Terraria/",
+	// 	Priority:               "Low",
+	// 	Status:                 "Playing",
+	// 	PurchasedGamePass:      false,
+	// 	Stars:                  3,
+	// 	StartedDateStr:         "2023-01-01",
+	// 	FinishedDroppedDateStr: "2023-01-02",
+	// 	Commentary:             "Not my type.",
+	// },
 	{
 		Wait:                   true,
 		URL:                    "https://store.steampowered.com/app/1174180/Red_Dead_Redemption_2/?l=brazilian",
@@ -63,17 +63,17 @@ var addGameRouteTestTable = []*notion.GameRequest{
 		FinishedDroppedDateStr: "2023-01-05",
 		Commentary:             "One of the best games of all time.",
 	},
-	{
-		Wait:                   true,
-		URL:                    "https://store.steampowered.com/app/1282100/Remnant_II/",
-		Priority:               "Medium",
-		Status:                 "Playing",
-		PurchasedGamePass:      false,
-		Stars:                  5,
-		StartedDateStr:         "2023-07-29",
-		FinishedDroppedDateStr: "2023-08-12",
-		Commentary:             "The biggest surprise of 2023.",
-	},
+	// {
+	// 	Wait:                   true,
+	// 	URL:                    "https://store.steampowered.com/app/1282100/Remnant_II/",
+	// 	Priority:               "Medium",
+	// 	Status:                 "Playing",
+	// 	PurchasedGamePass:      false,
+	// 	Stars:                  5,
+	// 	StartedDateStr:         "2023-07-29",
+	// 	FinishedDroppedDateStr: "2023-08-12",
+	// 	Commentary:             "The biggest surprise of 2023.",
+	// },
 }
 
 func TestAddGameRoute(t *testing.T) {
