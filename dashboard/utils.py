@@ -103,3 +103,32 @@ def show_authentication_page():
         st.error("Username/password is incorrect")
     elif st.session_state["authentication_status"] is None:
         st.warning("Please enter your username and password")
+
+
+def load_configs_from_file_without_cache(path: str = "../configs/configs.json"):
+    """Read a JSON file and return it as a Python dictionary.
+
+    Args:
+        path (str, optional): Path to JSON file. Defaults is "../configs/configs.json".
+
+    Returns:
+        dict: The configs from the file.
+    """
+    import json
+    import os
+
+    logger = logging.getLogger("load_configs_from_file")
+    logger.info("Reading configs from JSON file...")
+
+    absolute_path = os.path.abspath(os.path.dirname(__file__))
+    configs_path = os.path.join(absolute_path, path)
+
+    with open(configs_path, "r") as f:
+        configs = json.load(f)
+
+    return configs
+
+
+@st.cache_data(show_spinner=False)
+def load_configs_from_file():
+    return load_configs_from_file_without_cache()
