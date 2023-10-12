@@ -41,6 +41,7 @@ smmap==5.0.0
 streamlit==1.27.2
 streamlit-authenticator==0.2.3
 streamlit-calendar==0.6.0
+streamlit-pretty-notification-box==0.0.2
 tenacity==8.2.3
 toml==0.10.2
 toolz==0.12.0
