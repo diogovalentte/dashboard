@@ -29,7 +29,7 @@ func TestGetMediaMetadata(t *testing.T) {
 	}
 
 	mediaURL := "https://www.imdb.com/title/tt0137523"
-	actual, err, _ := notion.GetMediaMetadata(mediaURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
+	actual, err := notion.GetMediaMetadata(mediaURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -40,24 +40,24 @@ func TestGetMediaMetadata(t *testing.T) {
 }
 
 var addMediaRouteTestTable = []*notion.MediaRequest{
-	// {
-	// 	Wait:      true,
-	// 	MediaType: "Series",
-	// 	URL:       "https://www.imdb.com/title/tt1865718/?ref_=fn_al_tt_1",
-	// 	Priority:  "High",
-	// 	Status:    "Finished",
-	// },
-	// {
-	// 	Wait:                   true,
-	// 	URL:                    "https://www.imdb.com/title/tt1586680",
-	// 	MediaType:              "Series",
-	// 	Priority:               "High",
-	// 	Status:                 "To be released",
-	// 	Stars:                  5,
-	// 	StartedDateStr:         "2022-12-01",
-	// 	FinishedDroppedDateStr: "2023-01-05",
-	// 	Commentary:             "Shameless",
-	// },
+	{
+		Wait:      true,
+		MediaType: "Series",
+		URL:       "https://www.imdb.com/title/tt1865718/?ref_=fn_al_tt_1",
+		Priority:  "High",
+		Status:    "Finished",
+	},
+	{
+		Wait:                   true,
+		URL:                    "https://www.imdb.com/title/tt1586680",
+		MediaType:              "Series",
+		Priority:               "High",
+		Status:                 "To be released",
+		Stars:                  5,
+		StartedDateStr:         "2022-12-01",
+		FinishedDroppedDateStr: "2023-01-05",
+		Commentary:             "Shameless",
+	},
 	{
 		Wait:                   true,
 		URL:                    "https://www.imdb.com/title/tt0468569/?ref_=chttp_t_3",
