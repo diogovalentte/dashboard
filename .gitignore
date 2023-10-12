@@ -13,3 +13,6 @@ dashboard-api
 
 configs.json
 credentials.yaml
+
+# Data
+data/*

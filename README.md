@@ -2,7 +2,7 @@
 
 
 ## How to use:
-1. Install Golang and Python.
+1. Install Golang, Python and SQLite3.
 2. Install Firefox (from APT, not SNAP):
 ```sh
 sudo add-apt-repository ppa:mozillateam/ppa

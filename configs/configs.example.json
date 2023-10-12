@@ -1,18 +1,12 @@
 {
+  "database": {
+    "databases_folder_abs_path": "/home/user/folder" # change to the folder to store the SQLite databases
+  },
   "geckodriver": {
     "binary_path": "/opt/geckodriver/geckodriver", # don't change
     "port": 4444 # don't change
   },
   "firefox": {
     "binary_path": "/usr/bin/firefox"
-  },
-  "notion": {
-    "token": "",
-    "games_tracker": {
-      "db_id": ""
-    },
-    "medias_tracker": {
-      "db_id": ""
-    }
   }
 }

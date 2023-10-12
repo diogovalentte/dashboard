@@ -4,7 +4,7 @@ import (
 	"github.com/diogovalentte/dashboard/api/job"
 	"github.com/diogovalentte/dashboard/api/routes/health_check"
 	"github.com/diogovalentte/dashboard/api/routes/jobs"
-	"github.com/diogovalentte/dashboard/api/routes/notion"
+	"github.com/diogovalentte/dashboard/api/routes/trackers"
 	"github.com/gin-gonic/gin"
 )
 
@@ -33,11 +33,11 @@ func SetupRouter() *gin.Engine {
 	{
 		jobs.JobsRoutes(jobsGroup)
 	}
-	// Notion routes
-	notionGroup := v1.Group("/notion")
+	// Trackers routes
+	trackersGroup := v1.Group("/trackers")
 	{
-		notion.GamesTrackerRoutes(notionGroup)
-		notion.MediasTrackerRoutes(notionGroup)
+		trackers.GamesTrackerRoutes(trackersGroup)
+		trackers.MediasTrackerRoutes(trackersGroup)
 	}
 
 	return router

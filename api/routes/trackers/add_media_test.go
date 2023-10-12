@@ -1,4 +1,4 @@
-package notion_test
+package trackers_test
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/diogovalentte/dashboard/api"
-	"github.com/diogovalentte/dashboard/api/routes/notion"
+	"github.com/diogovalentte/dashboard/api/routes/trackers"
 	"github.com/diogovalentte/dashboard/api/util"
 )
 
@@ -20,7 +20,7 @@ func TestGetMediaMetadata(t *testing.T) {
 		panic(err)
 	}
 
-	expected := notion.ScrapedMediaProperties{
+	expected := trackers.ScrapedMediaProperties{
 		Name:        "Fight Club",
 		CoverURL:    "https://m.media-amazon.com/images/M/MV5BODQ0OWJiMzktYjNlYi00MzcwLThlZWMtMzRkYTY4ZDgxNzgxXkEyXkFqcGdeQXVyNzkwMjQ5NzM@._V1_QL75_UX190_CR0,2,190,281_.jpg",
 		ReleaseDate: time.Date(1999, 10, 15, 0, 0, 0, 0, time.UTC),
@@ -29,7 +29,7 @@ func TestGetMediaMetadata(t *testing.T) {
 	}
 
 	mediaURL := "https://www.imdb.com/title/tt0137523"
-	actual, err := notion.GetMediaMetadata(mediaURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
+	actual, err := trackers.GetMediaMetadata(mediaURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -39,7 +39,7 @@ func TestGetMediaMetadata(t *testing.T) {
 	}
 }
 
-var addMediaRouteTestTable = []*notion.MediaRequest{
+var addMediaRouteTestTable = []*trackers.MediaRequest{
 	{
 		Wait:      true,
 		MediaType: "Series",
@@ -81,7 +81,7 @@ func TestAddMediaRoute(t *testing.T) {
 		}
 
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest(http.MethodPost, "/v1/notion/medias_tracker/add_media", bytes.NewBuffer(requestBody))
+		req, err := http.NewRequest(http.MethodPost, "/v1/trackers/medias_tracker/add_media", bytes.NewBuffer(requestBody))
 		if err != nil {
 			t.Error(err)
 		}
@@ -97,7 +97,7 @@ func TestAddMediaRoute(t *testing.T) {
 			t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
 		}
 
-		expectedMessage := "Media page created with success"
+		expectedMessage := "Media inserted into DB"
 		actualMessage, exists := resMap["message"]
 		if !exists {
 			t.Error(`Response body has no field "message"`)

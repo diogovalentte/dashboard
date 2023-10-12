@@ -1,15 +1,22 @@
 package util
 
 import (
+	"fmt"
+	"io"
+	"net/http"
 	"reflect"
 
 	"github.com/spf13/viper"
 )
 
 type Configs struct {
+	Database    DatabaseConfigs    `mapstructure:"database"`
 	GeckoDriver GeckoDriverConfigs `mapstructure:"geckodriver"`
 	Firefox     FirefoxConfigs     `mapstructure:"firefox"`
-	Notion      NotionConfigs      `mapstructure:"notion"`
+}
+
+type DatabaseConfigs struct {
+	FolderPath string `mapstructure:"databases_folder_abs_path"`
 }
 
 type GeckoDriverConfigs struct {
@@ -19,12 +26,6 @@ type GeckoDriverConfigs struct {
 
 type FirefoxConfigs struct {
 	BinaryPath string `mapstructure:"binary_path"`
-}
-
-type NotionConfigs struct {
-	Token         string               `mapstructure:"token"`
-	GamesTracker  GamesTrackerConfigs  `mapstructure:"games_tracker"`
-	MediasTracker MediasTrackerConfigs `mapstructure:"medias_tracker"`
 }
 
 type GamesTrackerConfigs struct {
@@ -61,4 +62,26 @@ func GetConfigsWithoutDefaults(configPath string) (*Configs, error) {
 func GetConfigs() (*Configs, error) {
 	defaultConfigPath := "configs"
 	return GetConfigsWithoutDefaults(defaultConfigPath)
+}
+
+func GetImageFromURL(imageURL string) ([]byte, error) {
+	response, err := http.Get(imageURL)
+	if err != nil {
+		err = fmt.Errorf("error downloading game cover image: %s", err)
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		err = fmt.Errorf("failed to download game cover image. Status code: %d", response.StatusCode)
+		return nil, err
+	}
+
+	imageBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		err = fmt.Errorf("error reading game cover image data: %s", err)
+		return nil, err
+	}
+
+	return imageBytes, nil
 }

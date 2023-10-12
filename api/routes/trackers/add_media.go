@@ -1,16 +1,16 @@
-package notion
+package trackers
 
 import (
-	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/diogovalentte/dashboard/api/job"
 	"github.com/diogovalentte/dashboard/api/scraping"
 	"github.com/diogovalentte/dashboard/api/util"
-	"github.com/diogovalentte/notionapi"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -51,15 +51,15 @@ func AddMedia(c *gin.Context) {
 		return
 	}
 
-	// Get media info from a media site and create the media notion page
-	configs, err := util.GetConfigs()
+	// Get media info from a media site and create the media trackers page
+	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
 		currentJob.SetFailedState(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	// Get media info from a web site and create the media notion page
+	// Get media info from a web site and create the media trackers page
 	if !mediaRequest.Wait {
 		go addMediaTask(&currentJob, &mediaRequest, configs, c, mediaRequest.Wait)
 		c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
@@ -112,8 +112,15 @@ func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util
 
 	currentJob.SetExecutingStateWithValue("Creating media page", scrapedMediaProperties.Name)
 
-	mediaProperties := mergeToMediaProperties(mediaRequest, scrapedMediaProperties)
-	_, notionPageURL, err := createMediaPage(mediaProperties, (*configs).Notion.MediasTracker.DBID)
+	mediaProperties, err := getMediaProperties(mediaRequest, scrapedMediaProperties)
+	if err != nil {
+		currentJob.SetFailedState(err)
+		if wait {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		}
+		return
+	}
+	err = insertMediaToDB(mediaProperties)
 	if err != nil {
 		currentJob.SetFailedState(err)
 		if wait {
@@ -122,19 +129,19 @@ func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util
 		return
 	}
 
-	currentJob.SetCompletedStateWithValue("Media page created", notionPageURL)
+	currentJob.SetCompletedState("Media inserted into DB")
 
 	if wait {
-		c.JSON(http.StatusOK, gin.H{"message": "Media page created with success"})
+		c.JSON(http.StatusOK, gin.H{"message": "Media inserted into DB"})
 	}
 }
 
 func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (*ScrapedMediaProperties, error) {
 	// Gets media metadata from a media site (IMDB)
 	mediaURL = strings.SplitN(mediaURL, "?", 2)[0]
-	IMDB_Prefix := "https://www.imdb.com/title/"
-	if isIMDB_URL := strings.HasPrefix(mediaURL, IMDB_Prefix); !isIMDB_URL {
-		return nil, fmt.Errorf("the media url %s is not a valid IMDB url, it should start with: %s", mediaURL, IMDB_Prefix)
+	IMDBPrefix := "https://www.imdb.com/title/"
+	if isIMDB_URL := strings.HasPrefix(mediaURL, IMDBPrefix); !isIMDB_URL {
+		return nil, fmt.Errorf("the media url %s is not a valid IMDB url, it should start with: %s", mediaURL, IMDBPrefix)
 	}
 
 	wd, err := scraping.GetWebDriver(firefoxPath, geckoDriverServerPort)
@@ -239,31 +246,41 @@ func mediaNameCondition(wd selenium.WebDriver) (bool, error) {
 	return true, nil
 }
 
-func mergeToMediaProperties(mr *MediaRequest, smp *ScrapedMediaProperties) *MediaProperties {
+func getMediaProperties(mr *MediaRequest, smp *ScrapedMediaProperties) (*MediaProperties, error) {
+	coverImg, err := util.GetImageFromURL(smp.CoverURL)
+	if err != nil {
+		return nil, err
+	}
+
+	genres := strings.Join(smp.Genres, ",")
+	staff := strings.Join(smp.Staff, ",")
+
 	return &MediaProperties{
 		Name:                smp.Name,
 		URL:                 mr.URL,
 		MediaType:           mr.MediaType,
-		CoverURL:            smp.CoverURL,
+		CoverImg:            coverImg,
 		ReleaseDate:         smp.ReleaseDate,
-		Genres:              smp.Genres,
-		Staff:               smp.Staff,
+		GenresStr:           genres,
+		StaffStr:            staff,
 		Priority:            mr.Priority,
 		Status:              mr.Status,
 		Stars:               mr.Stars,
 		StartedDate:         mr.StartedDate,
 		FinishedDroppedDate: mr.FinishedDroppedDate,
 		Commentary:          mr.Commentary,
-	}
+	}, nil
 }
 
 type MediaProperties struct {
 	Name                string
 	URL                 string
 	MediaType           string
-	CoverURL            string
+	CoverImg            []byte
 	ReleaseDate         time.Time
+	GenresStr           string
 	Genres              []string
+	StaffStr            string
 	Staff               []string
 	Priority            string
 	Status              string
@@ -273,139 +290,51 @@ type MediaProperties struct {
 	Commentary          string
 }
 
-func createMediaPage(mp *MediaProperties, DB_ID string) (notionapi.ObjectID, string, error) {
-	pageCreateRequest := getMediaPageRequest(mp, DB_ID)
-
-	client, err := GetNotionClient()
+func insertMediaToDB(mp *MediaProperties) error {
+	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
-		return "", "", err
+		return err
 	}
+	dbPath := filepath.Join(configs.Database.FolderPath, "trackers.db")
 
-	page, err := client.Page.Create(context.Background(), pageCreateRequest)
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		return "", "", err
+		return err
+	}
+	defer db.Close()
+
+	stm, err := db.Prepare(`
+INSERT INTO medias_tracker (
+  url, name, media_type, cover_img, release_date, genres, staff, priority,
+  status, stars, started_date, finished_dropped_date, commentary
+)
+VALUES (
+  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+)
+  `)
+	if err != nil {
+		return err
+	}
+	defer stm.Close()
+
+	_, err = stm.Exec(
+		mp.URL,
+		mp.Name,
+		mp.MediaType,
+		mp.CoverImg,
+		mp.ReleaseDate,
+		mp.GenresStr,
+		mp.StaffStr,
+		mp.Priority,
+		mp.Status,
+		mp.Stars,
+		mp.StartedDate,
+		mp.FinishedDroppedDate,
+		mp.Commentary,
+	)
+	if err != nil {
+		return err
 	}
 
-	// Add commentary
-	if mp.Commentary != "" {
-		_, err = client.Block.AppendChildren(context.Background(), notionapi.BlockID(page.ID), &notionapi.AppendBlockChildrenRequest{
-			Children: []notionapi.Block{
-				notionapi.QuoteBlock{
-					BasicBlock: notionapi.BasicBlock{
-						Type:   notionapi.BlockType("quote"),
-						Object: notionapi.ObjectType("block"),
-					},
-					Quote: notionapi.Quote{
-						RichText: []notionapi.RichText{
-							{
-								Type: notionapi.ObjectType("text"),
-								Text: &notionapi.Text{
-									Content: mp.Commentary,
-								},
-							},
-						},
-					},
-				},
-			},
-		})
-		if err != nil {
-			_, archivePageErr := ArchivePage(page.ID.String())
-			if archivePageErr != nil {
-				return "", "", fmt.Errorf("couldn't add commentary to the media page because of the error: %s. Also tried to archive the page, but an error occuried: %s", err, archivePageErr)
-			}
-			return "", "", fmt.Errorf("couldn't add commentary to the media page because of the error: %s", err)
-		}
-	}
-
-	return page.ID, page.URL, nil
-}
-
-func getMediaPageRequest(mp *MediaProperties, DB_ID string) *notionapi.PageCreateRequest {
-	validProperties := getValidMediaProperties(mp)
-
-	pageCreateRequest := &notionapi.PageCreateRequest{
-		Parent: notionapi.Parent{
-			DatabaseID: notionapi.DatabaseID(DB_ID),
-		},
-		Cover: &notionapi.Image{
-			Type:     "external",
-			External: &notionapi.FileObject{URL: mp.CoverURL},
-		},
-		Properties: *validProperties,
-	}
-
-	return pageCreateRequest
-}
-
-func getValidMediaProperties(mp *MediaProperties) *notionapi.Properties {
-	releaseDate := notionapi.Date(mp.ReleaseDate)
-	genres := transformIntoMultiSelect(&mp.Genres)
-	staff := transformIntoMultiSelect(&mp.Staff)
-
-	mediaProperties := notionapi.Properties{
-		"Name": notionapi.TitleProperty{
-			Title: []notionapi.RichText{
-				{Text: &notionapi.Text{Content: mp.Name}},
-			},
-		},
-		"Link": notionapi.URLProperty{
-			URL: mp.URL,
-		},
-		"Type": notionapi.SelectProperty{
-			Select: notionapi.Option{
-				Name: mp.MediaType,
-			},
-		},
-		"Release date": notionapi.DateProperty{
-			Date: &notionapi.DateObject{
-				Start: &releaseDate,
-			},
-		},
-		"Genres": notionapi.MultiSelectProperty{
-			MultiSelect: *genres,
-		},
-		"Staff": notionapi.MultiSelectProperty{
-			MultiSelect: *staff,
-		},
-		"Priority": notionapi.SelectProperty{
-			Select: notionapi.Option{
-				Name: mp.Priority,
-			},
-		},
-		"Status": notionapi.StatusProperty{
-			Status: notionapi.Option{
-				Name: mp.Status,
-			},
-		},
-	}
-
-	// Optional properties
-	if mp.Stars != 0 {
-		stars := getStarsEmojis(mp.Stars)
-		mediaProperties["Stars"] = notionapi.SelectProperty{
-			Select: notionapi.Option{
-				Name: stars,
-			},
-		}
-	}
-
-	if !mp.StartedDate.IsZero() {
-		startedDate := notionapi.Date(mp.StartedDate)
-		mediaProperties["Started date"] = notionapi.DateProperty{
-			Date: &notionapi.DateObject{
-				Start: &startedDate,
-			},
-		}
-	}
-
-	if !mp.FinishedDroppedDate.IsZero() {
-		finishedDroppedDate := notionapi.Date(mp.FinishedDroppedDate)
-		mediaProperties["Finished/Dropped date"] = notionapi.DateProperty{
-			Date: &notionapi.DateObject{
-				Start: &finishedDroppedDate,
-			},
-		}
-	}
-
-	return &mediaProperties
+	return nil
 }

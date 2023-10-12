@@ -1,4 +1,4 @@
-package notion
+package trackers
 
 import (
 	"database/sql"
@@ -53,7 +53,7 @@ func AddGame(c *gin.Context) {
 		return
 	}
 
-	// Get game info from a web store and create the game notion page
+	// Get game info from a web store and create the game trackers page
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
 		currentJob.SetFailedState(err)
@@ -61,7 +61,7 @@ func AddGame(c *gin.Context) {
 		return
 	}
 
-	// Get game info from a web store and create the game notion page
+	// Get game info from a web store and create the game trackers page
 	if !gameRequest.Wait {
 		go addGameTask(&currentJob, &gameRequest, configs, c, gameRequest.Wait)
 		c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
@@ -122,7 +122,6 @@ func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Co
 		}
 		return
 	}
-	// _, notionPageURL, err := createGamePage(gameProperties, (*configs).Notion.GamesTracker.DBID)
 	err = insertGameToDB(gameProperties)
 	if err != nil {
 		currentJob.SetFailedState(err)
@@ -135,7 +134,7 @@ func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Co
 	currentJob.SetCompletedState("Game inserted into DB")
 
 	if wait {
-		c.JSON(http.StatusOK, gin.H{"message": "Game page created with success"})
+		c.JSON(http.StatusOK, gin.H{"message": "Game inserted into DB"})
 	}
 }
 
