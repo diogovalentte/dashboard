@@ -272,6 +272,33 @@ class TrackersAPIClient:
 
         return st.session_state.get("all_games")
 
+    def get_playing_games(self):
+        """Return games that the user is currently playing"""
+        if not st.session_state.get("update_playing_games", None) in (True, None):
+            return st.session_state.get("playing_games")
+        path = "/v1/trackers/games_tracker/get_playing_games"
+        url = urljoin(self.base_url, path)
+
+        res = requests.get(url)
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while getting playing games from the games tracker database",
+                url,
+                "GET",
+                res.status_code,
+                res.text,
+            )
+
+        games = res.json().get("games")
+        if games is not None:
+            games = {game["Name"]: game for game in games}
+        else:
+            games = dict()
+        st.session_state["playing_games"] = games
+        st.session_state["update_playing_games"] = False
+
+        return st.session_state.get("playing_games")
+
     def get_to_be_released_games(self):
         """Return games that are to be released"""
         if not st.session_state.get("update_to_be_released_games", None) in (True, None):

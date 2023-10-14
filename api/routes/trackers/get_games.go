@@ -31,6 +31,41 @@ FROM
 	c.JSON(http.StatusOK, gin.H{"games": games})
 }
 
+func GetPlayingGames(c *gin.Context) {
+	sqlQuery := fmt.Sprintf(`
+SELECT
+  url, name, cover_img, release_date, tags, developers, publishers, priority,
+  status, stars, purchased_or_gamepass, started_date, finished_dropped_date
+FROM
+  games_tracker
+WHERE
+  status = 'Playing'
+ORDER BY
+  started_date DESC;`,
+	)
+
+	games, err := getGamesFromQuery(sqlQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err})
+		return
+	}
+
+	// Sort games by the Started Date putting the nulls at the end
+	var nullDate time.Time
+	sort.Slice(games, func(i, j int) bool {
+		if games[i].StartedDate == nullDate {
+			return false
+		}
+		if games[j].StartedDate == nullDate {
+			return true
+		}
+
+		return (*games[i]).StartedDate.After((*games[j]).StartedDate)
+	})
+
+	c.JSON(http.StatusOK, gin.H{"games": games})
+}
+
 func GetToBeReleasedGames(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT

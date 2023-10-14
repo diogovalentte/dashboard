@@ -28,9 +28,11 @@ class GamesTrackerPage:
         with st.sidebar.container():
             if (highlight_game := st.session_state.get("game_to_be_highlighted", None)) is not None:
                 with st.expander(highlight_game["Name"], True):
-                    self._show_game_img_priority_release_date_purchased_gamepass(highlight_game, {}, False)
+                    self._show_to_be_released_game(highlight_game, {}, False)
         with st.sidebar.expander("Add a game"):
             self.add_game()
+        with st.sidebar.expander("Playing games"):
+            self.show_playing_games_tab()
         self.api_client.show_all_jobs_updating()
 
     def show(self):
@@ -53,12 +55,20 @@ class GamesTrackerPage:
 
         self.sidebar()
 
+    def show_playing_games_tab(self):
+        games = self.api_client.get_playing_games()
+        if len(games) == 0:
+            st.info("No playing games")
+        else:
+            for game in games.values():
+                self._show_playing_game(game, games)
+
     def show_to_be_released_tab(self):
         games = self.api_client.get_to_be_released_games()
         games_gallery_col, calendar_col = st.columns([0.35, 0.75], gap="small")
 
         with games_gallery_col:
-            self.show_games(st.columns(2), games, self._show_game_img_priority_release_date_purchased_gamepass)
+            self.show_games(st.columns(2), games, self._show_to_be_released_game)
         with calendar_col:
             calendar_events = list()
             for name, game in games.items():
@@ -114,17 +124,17 @@ class GamesTrackerPage:
 
     def show_not_started_tab(self):
         games = self.api_client.get_not_started_games()
-        self.show_games(st.columns(5), games, self._show_game_img_priority_purchased_gamepass)
+        self.show_games(st.columns(5), games, self._show_not_started_game)
 
     def show_finished_tab(self):
         games = self.api_client.get_finished_games()
-        self.show_games(st.columns(5), games, self._show_game_img_priority_finished_date_stars)
+        self.show_games(st.columns(5), games, self._show_finished_game)
 
     def show_dropped_tab(self):
         games = self.api_client.get_dropped_games()
-        self.show_games(st.columns(5), games, self._show_game_img_priority_dropped_date_stars)
+        self.show_games(st.columns(5), games, self._show_dropped_game)
 
-    def _show_game_img_priority_release_date_purchased_gamepass(
+    def _show_to_be_released_game(
             self, game: dict,
             games: dict,
             show_highlight_button: bool = True
@@ -146,7 +156,29 @@ class GamesTrackerPage:
                 st.session_state["game_to_be_highlighted"] = games[game_name]
                 st.rerun()
 
-    def _show_game_img_priority_purchased_gamepass(self, game: dict, games: dict, show_highlight_button: bool = True):
+    def _show_playing_game(self, game: dict, games: dict, show_highlight_button: bool = True):
+        st.subheader(game["Name"])
+        img_bytes = base64.b64decode(game["CoverImg"])
+        img_stream = BytesIO(img_bytes)
+        st.image(img_stream)
+        st.write(self._get_priority(game["Priority"]))
+        started_date = self._get_date(game["StartedDate"])
+        if started_date is None:
+            started_date = "No started date"
+        st.write(started_date)
+        game_name = game["Name"]
+        if show_highlight_button and st.button(
+                "Highlight game",
+                key=f"show_playing_game_{game_name}"
+        ):
+            if game_name != st.session_state.get("game_name_to_be_highlighted"):
+                st.session_state["game_name_to_be_highlighted"] = game_name
+                st.session_state["game_to_be_highlighted"] = games[game_name]
+                st.rerun()
+        st.divider()
+
+
+    def _show_not_started_game(self, game: dict, games: dict, show_highlight_button: bool = True):
         img_bytes = base64.b64decode(game["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -155,14 +187,14 @@ class GamesTrackerPage:
         game_name = game["Name"]
         if show_highlight_button and st.button(
                 "Highlight game",
-                key=f"_show_game_img_priority_purchased_gamepass_{game_name}"
+                key=f"show_not_started_game_{game_name}"
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
                 st.session_state["game_to_be_highlighted"] = games[game_name]
                 st.rerun()
 
-    def _show_game_img_priority_finished_date_stars(self, game: dict, games: dict, show_highlight_button: bool = True):
+    def _show_finished_game(self, game: dict, games: dict, show_highlight_button: bool = True):
         img_bytes = base64.b64decode(game["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -173,14 +205,14 @@ class GamesTrackerPage:
         game_name = game["Name"]
         if show_highlight_button and st.button(
                 "Highlight game",
-                key=f"show_game_img_priority_finished_dropped_date_stars_{game_name}"
+                key=f"show_finished_game_{game_name}"
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
                 st.session_state["game_to_be_highlighted"] = games[game_name]
                 st.rerun()
 
-    def _show_game_img_priority_dropped_date_stars(self, game: dict, games: dict, show_highlight_button: bool = True):
+    def _show_dropped_game(self, game: dict, games: dict, show_highlight_button: bool = True):
         img_bytes = base64.b64decode(game["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -191,7 +223,7 @@ class GamesTrackerPage:
         game_name = game["Name"]
         if show_highlight_button and st.button(
                 "Highlight game",
-                key=f"show_game_img_priority_finished_dropped_date_stars_{game_name}"
+                key=f"show_dropped_game_{game_name}"
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
@@ -350,7 +382,7 @@ class GamesTrackerPage:
 
                 self.api_client.add_game(game_properties)
 
-                st.success("Game page requested")
+                st.success("Game requested")
                 st.session_state["update_all_games"] = True
 
 
