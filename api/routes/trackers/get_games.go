@@ -3,14 +3,14 @@ package trackers
 import (
 	"database/sql"
 	"fmt"
-	"github.com/diogovalentte/dashboard/api/util"
-	"github.com/gin-gonic/gin"
-	"log"
 	"net/http"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/diogovalentte/dashboard/api/util"
+	"github.com/gin-gonic/gin"
 )
 
 func GetAllGames(c *gin.Context) {
@@ -209,10 +209,7 @@ func getGamesFromQuery(sqlQuery string) ([]*GameProperties, error) {
 		gameProperties.Publishers = strings.Split(publishersStr, ",")
 
 		gamesProperties = append(gamesProperties, &gameProperties)
-		log.Println(gameProperties.Name)
 	}
-
-	log.Println(gamesProperties)
 
 	return gamesProperties, nil
 }
