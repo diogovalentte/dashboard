@@ -12,12 +12,8 @@ func init() {
 		panic(err)
 	}
 
-	// Start the GeckoDriver server
-	gds := scraping.NewGeckoDriverServer(configs.GeckoDriver.BinaryPath, configs.GeckoDriver.Port)
-
-	go gds.Start()
-
-	err = gds.Wait()
+	// Start the GeckoDriver pool
+	_, err = scraping.NewGeckoDriverPool(configs.GeckoDriver.BinaryPath, configs.GeckoDriver.PoolSize)
 	if err != nil {
 		panic(err)
 	}

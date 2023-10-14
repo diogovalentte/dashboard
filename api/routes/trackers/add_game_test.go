@@ -3,6 +3,7 @@ package trackers_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/diogovalentte/dashboard/api/job"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -30,7 +31,7 @@ func TestGetGameMetadata(t *testing.T) {
 	}
 
 	gameURL := "https://store.steampowered.com/app/1174180/Red_Dead_Redemption_2"
-	actual, err := trackers.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
+	actual, err := trackers.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, &job.Job{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -38,6 +39,8 @@ func TestGetGameMetadata(t *testing.T) {
 	if !reflect.DeepEqual(expected, *actual) {
 		t.Errorf("expected: %s, actual: %s", expected, *actual)
 	}
+
+	t.Logf("Game scraped: %s", actual.Name)
 }
 
 var addGameRouteTestTable = []*trackers.GameRequest{
@@ -83,12 +86,14 @@ func TestAddGameRoute(t *testing.T) {
 		requestBody, err := json.Marshal(gameRequest)
 		if err != nil {
 			t.Error(err)
+			return
 		}
 
 		w := httptest.NewRecorder()
 		req, err := http.NewRequest(http.MethodPost, "/v1/trackers/games_tracker/add_game", bytes.NewBuffer(requestBody))
 		if err != nil {
 			t.Error(err)
+			return
 		}
 		router.ServeHTTP(w, req)
 
@@ -96,13 +101,14 @@ func TestAddGameRoute(t *testing.T) {
 		jsonBytes := w.Body.Bytes()
 		if err := json.Unmarshal(jsonBytes, &resMap); err != nil {
 			t.Error(err)
+			return
 		}
 
 		if http.StatusOK != w.Code {
 			t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
 		}
 
-		expectedMessage := "Game page created with success"
+		expectedMessage := "Game inserted into DB"
 		actualMessage, exists := resMap["message"]
 		if !exists {
 			t.Error(`Response body has no field "message"`)

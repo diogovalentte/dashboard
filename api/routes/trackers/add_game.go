@@ -20,7 +20,7 @@ import (
 )
 
 func AddGame(c *gin.Context) {
-	// Create and add job
+	// Create job
 	currentJob := job.Job{
 		Task:      "Add game to Games Tracker database",
 		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
@@ -35,7 +35,12 @@ func AddGame(c *gin.Context) {
 
 	// Validate request
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterValidation("IsValidDate", IsValidDate)
+		err := v.RegisterValidation("IsValidDate", IsValidDate)
+		if err != nil {
+			currentJob.SetFailedState(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			return
+		}
 	}
 
 	var gameRequest GameRequest
@@ -101,9 +106,7 @@ func (gr *GameRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
 }
 
 func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Configs, c *gin.Context, wait bool) {
-	currentJob.SetExecutingStateWithValue("Scraping game data", gameRequest.URL)
-
-	scrapedGameProperties, err := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
+	scrapedGameProperties, err := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, currentJob)
 	if err != nil {
 		currentJob.SetFailedState(err)
 		if wait {
@@ -138,7 +141,7 @@ func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Co
 	}
 }
 
-func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*ScrapedGameProperties, error) {
+func GetGameMetadata(gameURL, firefoxPath string, job *job.Job) (*ScrapedGameProperties, error) {
 	// Gets game metadata from a web store (Steam)
 	gameURL = strings.SplitN(gameURL, "?", 2)[0]
 	steamPrefix := "https://store.steampowered.com/app/"
@@ -146,11 +149,14 @@ func GetGameMetadata(gameURL, firefoxPath string, geckoDriverServerPort int) (*S
 		return nil, fmt.Errorf("the game url %s is not a valid Steam url, it should start with: %s", gameURL, steamPrefix)
 	}
 
-	wd, err := scraping.GetWebDriver(firefoxPath, geckoDriverServerPort)
+	job.SetExecutingStateWithValue("Waiting for a WebDriver", gameURL)
+	wd, geckodriver, err := scraping.GetWebDriver(firefoxPath)
 	if err != nil {
 		return nil, err
 	}
 	defer wd.Close()
+	defer geckodriver.Release()
+	job.SetExecutingState("Scraping game data")
 
 	// Get the game properties
 	if err := wd.Get(gameURL); err != nil {

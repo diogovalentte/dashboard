@@ -3,6 +3,7 @@ package trackers_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/diogovalentte/dashboard/api/job"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -29,7 +30,7 @@ func TestGetMediaMetadata(t *testing.T) {
 	}
 
 	mediaURL := "https://www.imdb.com/title/tt0137523"
-	actual, err := trackers.GetMediaMetadata(mediaURL, configs.Firefox.BinaryPath, configs.GeckoDriver.Port)
+	actual, err := trackers.GetMediaMetadata(mediaURL, configs.Firefox.BinaryPath, &job.Job{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -37,6 +38,8 @@ func TestGetMediaMetadata(t *testing.T) {
 	if !reflect.DeepEqual(expected, *actual) {
 		t.Errorf("expected: %s, actual: %s", expected, *actual)
 	}
+
+	t.Logf("Media scraped: %s", actual.Name)
 }
 
 var addMediaRouteTestTable = []*trackers.MediaRequest{

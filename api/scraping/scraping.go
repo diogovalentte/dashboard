@@ -3,8 +3,11 @@ package scraping
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,13 +15,115 @@ import (
 	"github.com/tebeka/selenium/firefox"
 )
 
-type GeckoDriverServer struct {
-	GeckoDriverPath string
-	Port            int
-	addr            string
-	service         *selenium.Service
-	mutex           sync.Mutex
-	startError      error
+var geckoDriverPoolStartPort = 30000
+var geckoDriverPool GeckoDriverPool
+
+func NewGeckoDriverPool(geckoDriverPath string, size int) (*GeckoDriverPool, error) {
+	if !reflect.DeepEqual(geckoDriverPool, GeckoDriverPool{}) {
+		return &geckoDriverPool, nil
+	}
+
+	// Create pool
+	geckoDriverPool = GeckoDriverPool{
+		pool: make(map[int]*GeckoDriverServer, size),
+	}
+	nextPort := geckoDriverPoolStartPort
+	timeout := 20
+
+	for i := 0; i < size; {
+		if timeout == 0 {
+			closeErrs := stopGeckoDrivers(geckoDriverPool.pool) // Stop open geckodriver instances
+			if closeErrs != nil {
+				return nil, closeErrs
+			}
+			return nil, fmt.Errorf("unable to create geckodriver pool. All 20 tested ports are in use")
+		}
+
+		// Check port
+		available, err := isPortAvailable(nextPort)
+		if err != nil {
+			closeErrs := stopGeckoDrivers(geckoDriverPool.pool)
+			if closeErrs != nil {
+				return nil, closeErrs
+			}
+			return nil, err
+		}
+		if !available {
+			timeout--
+			nextPort++
+			continue
+		}
+
+		// Add to pool
+		gds := NewGeckoDriverServer(geckoDriverPath, nextPort)
+		err = gds.start()
+		if err != nil {
+			closeErrs := stopGeckoDrivers(geckoDriverPool.pool)
+			if closeErrs != nil {
+				return nil, closeErrs
+			}
+			return nil, err
+		}
+
+		geckoDriverPool.pool[nextPort] = gds
+		geckoDriverPool.ports = append(geckoDriverPool.ports, nextPort)
+		i++
+	}
+
+	return &geckoDriverPool, nil
+}
+
+type GeckoDriverPool struct {
+	// A map of port to geckodriver server
+	pool  map[int]*GeckoDriverServer
+	ports []int
+}
+
+func (gdp *GeckoDriverPool) StopAll() error {
+	err := stopGeckoDrivers(gdp.pool)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func stopGeckoDrivers(instances map[int]*GeckoDriverServer) error {
+	var errorsStr string
+	var errorsN int
+
+	for _, instance := range instances {
+		err := instance.Stop()
+		if err != nil {
+			errorsStr = fmt.Sprintf("%sError %d: %s; ", errorsStr, errorsN, err.Error())
+		}
+	}
+
+	if errorsStr == "" {
+		return nil
+	}
+	errors := fmt.Errorf("errors occured while stopping the geckodriver instances: %s", errorsStr)
+
+	return errors
+}
+
+func (gdp *GeckoDriverPool) WaitGet() (*GeckoDriverServer, error) {
+	// Wait for an available GeckoDriver instance
+	if len(gdp.pool) == 0 {
+		return nil, fmt.Errorf("empty pool")
+	}
+	for {
+		for _, instance := range gdp.pool {
+			if instance.busy {
+				continue
+			} else {
+				instance.busy = true
+				return instance, nil
+			}
+		}
+
+		time.Sleep(5 * time.Second)
+	}
 }
 
 func NewGeckoDriverServer(geckoDriverPath string, port int) *GeckoDriverServer {
@@ -31,7 +136,18 @@ func NewGeckoDriverServer(geckoDriverPath string, port int) *GeckoDriverServer {
 	}
 }
 
-func (gds *GeckoDriverServer) Start() error {
+type GeckoDriverServer struct {
+	GeckoDriverPath string
+	Port            int
+	// Indicates whether the server is being used or not
+	busy       bool
+	addr       string
+	service    *selenium.Service
+	mutex      sync.Mutex
+	startError error
+}
+
+func (gds *GeckoDriverServer) start() error {
 	gds.mutex.Lock()
 	defer gds.mutex.Unlock()
 
@@ -90,7 +206,33 @@ func (gds *GeckoDriverServer) Stop() error {
 	return nil
 }
 
-func GetWebDriver(firefoxPath string, driverPort int) (selenium.WebDriver, error) {
+func (gds *GeckoDriverServer) Release() {
+	gds.mutex.Lock()
+	defer gds.mutex.Unlock()
+
+	gds.busy = false
+}
+
+func isPortAvailable(port int) (bool, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+	if err != nil {
+		if strings.HasSuffix(err.Error(), "address already in use") {
+			return false, nil
+		}
+		return false, err
+	}
+	defer listener.Close()
+
+	return true, nil
+}
+
+func GetWebDriver(firefoxPath string) (selenium.WebDriver, *GeckoDriverServer, error) {
+	// Get driver
+	driver, err := geckoDriverPool.WaitGet()
+	if err != nil {
+		return nil, driver, err
+	}
+
 	// Connect to the GeckoDriver server running locally
 	caps := selenium.Capabilities{"browserName": "firefox"}
 	args := []string{"--headless"}
@@ -100,10 +242,10 @@ func GetWebDriver(firefoxPath string, driverPort int) (selenium.WebDriver, error
 	}
 	caps.AddFirefox(firefoxCaps)
 
-	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d", driverPort))
+	wd, err := selenium.NewRemote(caps, fmt.Sprintf(driver.addr))
 	if err != nil {
-		return nil, err
+		return nil, driver, err
 	}
 
-	return wd, nil
+	return wd, driver, nil
 }

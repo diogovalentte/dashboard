@@ -33,7 +33,12 @@ func AddMedia(c *gin.Context) {
 
 	// Validate request
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterValidation("IsValidDate", IsValidDate)
+		err := v.RegisterValidation("IsValidDate", IsValidDate)
+		if err != nil {
+			currentJob.SetFailedState(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			return
+		}
 	}
 
 	var mediaRequest MediaRequest
@@ -99,9 +104,7 @@ func (mr *MediaRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
 }
 
 func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util.Configs, c *gin.Context, wait bool) {
-	currentJob.SetExecutingStateWithValue("Scraping media data", mediaRequest.URL)
-
-	scrapedMediaProperties, err := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, (*configs).GeckoDriver.Port)
+	scrapedMediaProperties, err := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, currentJob)
 	if err != nil {
 		currentJob.SetFailedState(err)
 		if wait {
@@ -136,7 +139,7 @@ func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util
 	}
 }
 
-func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (*ScrapedMediaProperties, error) {
+func GetMediaMetadata(mediaURL, firefoxPath string, job *job.Job) (*ScrapedMediaProperties, error) {
 	// Gets media metadata from a media site (IMDB)
 	mediaURL = strings.SplitN(mediaURL, "?", 2)[0]
 	IMDBPrefix := "https://www.imdb.com/title/"
@@ -144,11 +147,14 @@ func GetMediaMetadata(mediaURL, firefoxPath string, geckoDriverServerPort int) (
 		return nil, fmt.Errorf("the media url %s is not a valid IMDB url, it should start with: %s", mediaURL, IMDBPrefix)
 	}
 
-	wd, err := scraping.GetWebDriver(firefoxPath, geckoDriverServerPort)
+	job.SetExecutingStateWithValue("Waiting for a WebDriver", mediaURL)
+	wd, geckodriver, err := scraping.GetWebDriver(firefoxPath)
 	if err != nil {
 		return nil, err
 	}
 	defer wd.Close()
+	defer geckodriver.Release()
+	job.SetExecutingState("Scraping media data")
 
 	// Get the media properties
 	if err := wd.Get(mediaURL); err != nil {

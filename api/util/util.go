@@ -21,7 +21,7 @@ type DatabaseConfigs struct {
 
 type GeckoDriverConfigs struct {
 	BinaryPath string `mapstructure:"binary_path"`
-	Port       int    `mapstructure:"port"`
+	PoolSize   int    `mapstructure:"pool_size"`
 }
 
 type FirefoxConfigs struct {

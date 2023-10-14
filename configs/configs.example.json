@@ -4,7 +4,7 @@
   },
   "geckodriver": {
     "binary_path": "/opt/geckodriver/geckodriver", # don't change
-    "port": 4444 # don't change
+    "pool_size": 3
   },
   "firefox": {
     "binary_path": "/usr/bin/firefox"
