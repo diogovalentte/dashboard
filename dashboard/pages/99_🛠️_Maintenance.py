@@ -19,7 +19,11 @@ class MaintenancePage:
         self.create_service_status_widget(
             "Backend API", "http://localhost:8080/v1/health"
         )
-        self.create_service_status_widget("Geckodriver", "http://localhost:4444/status")
+        geckodriver_instances_addresses = self.api_client.get_geckodriver_instances_addresses()
+        count = 1
+        for addr in geckodriver_instances_addresses:
+            self.create_service_status_widget(f"Geckodriver {count}", addr + "/status")
+            count += 1
 
         st.sidebar.divider()
 

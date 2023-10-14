@@ -102,6 +102,26 @@ class MediaProperties(JSONBody):
         return self.media_properties
 
 
+class SystemAPIClient:
+    def __init__(self) -> None:
+        self.base_url: str = ""
+
+    def get_geckodriver_instances_addresses(self):
+        path = "/v1/system/get_geckodrivers"
+        url = urljoin(self.base_url, path)
+
+        res = requests.get(url)
+        if res.status_code != 200:
+            raise APIException(
+                "error while getting the geckodriver instances addresses from the API",
+                url,
+                "GET",
+                res.status_code,
+                res.text,
+            )
+
+        return res.json().get("addresses", [])
+
 class JobsAPIClient:
     def __init__(self) -> None:
         self.base_url: str = ""
@@ -500,7 +520,7 @@ class TrackersAPIClient:
 
         return st.session_state.get("dropped_medias")
 
-class APIClient(JobsAPIClient, TrackersAPIClient):
+class APIClient(JobsAPIClient, TrackersAPIClient, SystemAPIClient):
     def __init__(self, base_URL: str, port: int) -> None:
         self.base_url = f"{base_URL}:{port}"
         self.acceptable_status_codes = (200, 400)
