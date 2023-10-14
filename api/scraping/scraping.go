@@ -26,6 +26,7 @@ func NewGeckoDriverPool(geckoDriverPath string, size int) (*GeckoDriverPool, err
 	// Create pool
 	geckoDriverPool = GeckoDriverPool{
 		pool: make(map[int]*GeckoDriverServer, size),
+		size: size,
 	}
 	nextPort := geckoDriverPoolStartPort
 	timeout := 20
@@ -77,6 +78,7 @@ type GeckoDriverPool struct {
 	// A map of port to geckodriver server
 	pool  map[int]*GeckoDriverServer
 	ports []int
+	size  int
 }
 
 func (gdp *GeckoDriverPool) StopAll() error {
@@ -124,6 +126,15 @@ func (gdp *GeckoDriverPool) WaitGet() (*GeckoDriverServer, error) {
 
 		time.Sleep(5 * time.Second)
 	}
+}
+
+func (gdp *GeckoDriverPool) List() []string {
+	var instancesAddr []string
+	for _, instance := range gdp.pool {
+		instancesAddr = append(instancesAddr, instance.addr)
+	}
+
+	return instancesAddr
 }
 
 func NewGeckoDriverServer(geckoDriverPath string, port int) *GeckoDriverServer {

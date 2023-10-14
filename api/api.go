@@ -4,6 +4,7 @@ import (
 	"github.com/diogovalentte/dashboard/api/job"
 	"github.com/diogovalentte/dashboard/api/routes/health_check"
 	"github.com/diogovalentte/dashboard/api/routes/jobs"
+	"github.com/diogovalentte/dashboard/api/routes/system"
 	"github.com/diogovalentte/dashboard/api/routes/trackers"
 	"github.com/gin-gonic/gin"
 )
@@ -32,6 +33,11 @@ func SetupRouter() *gin.Engine {
 	jobsGroup := v1.Group("/jobs")
 	{
 		jobs.JobsRoutes(jobsGroup)
+	}
+	// System routes
+	systemGroup := v1.Group("/system")
+	{
+		system.SystemRoutes(systemGroup)
 	}
 	// Trackers routes
 	trackersGroup := v1.Group("/trackers")
