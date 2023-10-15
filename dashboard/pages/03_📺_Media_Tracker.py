@@ -34,9 +34,11 @@ class MediasTrackerPage:
         with st.sidebar.container():
             if (highlight_media := st.session_state.get("media_to_be_highlighted", None)) is not None:
                 with st.expander(highlight_media["Name"], True):
-                    self._show_media_img_type_priority_release_date(highlight_media, {}, False)
+                    self._show_to_be_released_media(highlight_media, {}, False)
         with st.sidebar.expander("Add a media"):
             self.add_media()
+        with st.sidebar.expander("Watching/Reading medias"):
+            self.show_watching_reading_medias_tab()
         self.api_client.show_all_jobs_updating()
 
     def show(self):
@@ -59,12 +61,20 @@ class MediasTrackerPage:
 
         self.sidebar()
 
+    def show_watching_reading_medias_tab(self):
+        medias = self.api_client.get_watching_reading_medias()
+        if len(medias) == 0:
+            st.info("No watching/reading medias")
+        else:
+            for media in medias.values():
+                self._show_watching_reading_media(media, medias)
+
     def show_to_be_released_tab(self):
         medias = self.api_client.get_to_be_released_medias()
         medias_gallery_col, calendar_col = st.columns([0.35, 0.75], gap="small")
 
         with medias_gallery_col:
-            self.show_medias(st.columns(3), medias, self._show_media_img_type_priority_release_date)
+            self.show_medias(st.columns(3), medias, self._show_to_be_released_media)
         with calendar_col:
             calendar_events = list()
             for name, media in medias.items():
@@ -120,17 +130,38 @@ class MediasTrackerPage:
 
     def show_not_started_tab(self):
         medias = self.api_client.get_not_started_medias()
-        self.show_medias(st.columns(10), medias, self._show_media_img_type_priority)
+        self.show_medias(st.columns(10), medias, self._show_not_started_media)
 
     def show_finished_tab(self):
         medias = self.api_client.get_finished_medias()
-        self.show_medias(st.columns(10), medias, self._show_media_img_type_priority_finished_date_stars)
+        self.show_medias(st.columns(10), medias, self._show_finished_media)
 
     def show_dropped_tab(self):
         medias = self.api_client.get_dropped_medias()
-        self.show_medias(st.columns(10), medias, self._show_media_img_type_priority_dropped_date_stars)
+        self.show_medias(st.columns(10), medias, self._show_dropped_media)
 
-    def _show_media_img_type_priority_release_date(
+    def _show_watching_reading_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
+        st.subheader(media["Name"])
+        img_bytes = base64.b64decode(media["CoverImg"])
+        img_stream = BytesIO(img_bytes)
+        st.image(img_stream, use_column_width=True)
+        st.write(self._get_priority(media["Priority"]))
+        started_date = self._get_date(media["StartedDate"])
+        if started_date is None:
+            started_date = "No started date"
+        st.write(started_date)
+        media_name = media["Name"]
+        if show_highlight_button and st.button(
+                "Highlight media",
+                key=f"show_watching_reading_media_{media_name}"
+        ):
+            if media_name != st.session_state.get("media_name_to_be_highlighted"):
+                st.session_state["media_name_to_be_highlighted"] = media_name
+                st.session_state["media_to_be_highlighted"] = medias[media_name]
+                st.rerun()
+        st.divider()
+
+    def _show_to_be_released_media(
             self, media: dict,
             medias: dict,
             show_highlight_button: bool = True
@@ -145,14 +176,14 @@ class MediasTrackerPage:
         media_name = media["Name"]
         if show_highlight_button and st.button(
                 "Highlight media",
-                key=f"show_media_img_type_priority_release_date_{media_name}"
+                key=f"show_to_be_released_media_{media_name}"
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
                 st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
 
-    def _show_media_img_type_priority(self, media: dict, medias: dict, show_highlight_button: bool = True):
+    def _show_not_started_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
         img_bytes = base64.b64decode(media["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -161,14 +192,14 @@ class MediasTrackerPage:
         media_name = media["Name"]
         if show_highlight_button and st.button(
                 "Highlight media",
-                key=f"show_media_img_type_priority_{media_name}"
+                key=f"show_not_started_media_{media_name}"
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
                 st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
 
-    def _show_media_img_type_priority_finished_date_stars(self, media: dict, medias: dict, show_highlight_button: bool = True):
+    def _show_finished_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
         img_bytes = base64.b64decode(media["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -180,14 +211,14 @@ class MediasTrackerPage:
         media_name = media["Name"]
         if show_highlight_button and st.button(
                 "Highlight media",
-                key=f"show_media_img_type_priority_finished_date_stars_{media_name}"
+                key=f"show_finished_media_{media_name}"
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
                 st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
 
-    def _show_media_img_type_priority_dropped_date_stars(self, media: dict, medias: dict, show_highlight_button: bool = True):
+    def _show_dropped_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
         img_bytes = base64.b64decode(media["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -199,7 +230,7 @@ class MediasTrackerPage:
         media_name = media["Name"]
         if show_highlight_button and st.button(
                 "Highlight media",
-                key=f"show_media_img_type_priority_dropped_date_stars_{media_name}"
+                key=f"show_dropped_media_{media_name}"
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name

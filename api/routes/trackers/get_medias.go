@@ -30,6 +30,41 @@ FROM
 	c.JSON(http.StatusOK, gin.H{"medias": medias})
 }
 
+func GetWatchingReadingMedias(c *gin.Context) {
+	sqlQuery := fmt.Sprintf(`
+SELECT
+  url, name, media_type, cover_img, release_date, genres, staff,
+  priority, status, stars, started_date, finished_dropped_date
+FROM
+  medias_tracker
+WHERE
+  status = 'Watching/Reading'
+ORDER BY
+  started_date DESC;`,
+	)
+
+	medias, err := getMediasFromQuery(sqlQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err})
+		return
+	}
+
+	// Sort medias by the Started date putting the nulls at the end
+	var nullDate time.Time
+	sort.Slice(medias, func(i, j int) bool {
+		if medias[i].StartedDate == nullDate {
+			return false
+		}
+		if medias[j].StartedDate == nullDate {
+			return true
+		}
+
+		return (*medias[i]).StartedDate.After((*medias[j]).StartedDate)
+	})
+
+	c.JSON(http.StatusOK, gin.H{"medias": medias})
+}
+
 func GetToBeReleasedMedias(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT

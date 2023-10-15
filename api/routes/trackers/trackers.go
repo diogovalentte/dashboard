@@ -27,6 +27,7 @@ func MediasTrackerRoutes(group *gin.RouterGroup) {
 	{
 		medias_tracker_group.POST("/add_media", AddMedia)
 		medias_tracker_group.GET("/get_all_medias", GetAllMedias)
+		medias_tracker_group.GET("/get_watching_reading_medias", GetWatchingReadingMedias)
 		medias_tracker_group.GET("/get_to_be_released_medias", GetToBeReleasedMedias)
 		medias_tracker_group.GET("/get_not_started_medias", GetNotStartedMedias)
 		medias_tracker_group.GET("/get_finished_medias", GetFinishedMedias)

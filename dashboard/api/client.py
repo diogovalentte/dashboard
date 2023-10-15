@@ -435,6 +435,34 @@ class TrackersAPIClient:
 
         return st.session_state.get("all_medias")
 
+    def get_watching_reading_medias(
+            self
+    ):
+        if not st.session_state.get("update_watching_reading_medias", None) in (True, None):
+            return st.session_state.get("watching_reading_medias")
+        path = "/v1/trackers/medias_tracker/get_watching_reading_medias"
+        url = urljoin(self.base_url, path)
+
+        res = requests.get(url)
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while getting watching/reading medias from the medias tracker database",
+                url,
+                "GET",
+                res.status_code,
+                res.text,
+            )
+
+        medias = res.json().get("medias")
+        if medias is not None:
+            medias = {media["Name"]: media for media in medias}
+        else:
+            medias = dict()
+        st.session_state["watching_reading_medias"] = medias
+        st.session_state["update_watching_reading_medias"] = False
+
+        return st.session_state.get("watching_reading_medias")
+
     def get_to_be_released_medias(
             self
     ):
