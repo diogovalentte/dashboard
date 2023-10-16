@@ -34,16 +34,18 @@ func TestGetGameMetadata(t *testing.T) {
 	actual, err := trackers.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, &job.Job{})
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if !reflect.DeepEqual(expected, *actual) {
 		t.Errorf("expected: %s, actual: %s", expected, *actual)
+		return
 	}
 
 	t.Logf("Game scraped: %s", actual.Name)
 }
 
-var addGameRouteTestTable = []*trackers.GameRequest{
+var addGameRouteTestTable = []*trackers.AddGameRequest{
 	{
 		Wait:                   true,
 		URL:                    "https://store.steampowered.com/app/105600/Terraria/",
@@ -86,14 +88,14 @@ func TestAddGameRoute(t *testing.T) {
 		requestBody, err := json.Marshal(gameRequest)
 		if err != nil {
 			t.Error(err)
-			return
+			continue
 		}
 
 		w := httptest.NewRecorder()
 		req, err := http.NewRequest(http.MethodPost, "/v1/trackers/games_tracker/add_game", bytes.NewBuffer(requestBody))
 		if err != nil {
 			t.Error(err)
-			return
+			continue
 		}
 		router.ServeHTTP(w, req)
 
@@ -101,22 +103,33 @@ func TestAddGameRoute(t *testing.T) {
 		jsonBytes := w.Body.Bytes()
 		if err := json.Unmarshal(jsonBytes, &resMap); err != nil {
 			t.Error(err)
-			return
-		}
-
-		if http.StatusOK != w.Code {
-			t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
+			continue
 		}
 
 		expectedMessage := "Game inserted into DB"
 		actualMessage, exists := resMap["message"]
-		if !exists {
-			t.Error(`Response body has no field "message"`)
-		}
-		if actualMessage != expectedMessage {
-			t.Errorf(`expected message: %s, actual message: %s`, expectedMessage, actualMessage)
-		}
+		if http.StatusOK != w.Code {
+			if !exists {
+				t.Error(`Response body has no field "message"`)
+				continue
+			}
+			if actualMessage == "UNIQUE constraint failed: games_tracker.name" {
+				t.Log("Game already in database")
+				continue
+			} else {
+				t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
+				t.Errorf(`expected message: %s, actual message: %s`, expectedMessage, actualMessage)
+				continue
+			}
+		} else {
+			if !exists {
+				t.Error(`Response body has no field "message"`)
+			}
+			if actualMessage != expectedMessage {
+				t.Errorf(`expected message: %s, actual message: %s`, expectedMessage, actualMessage)
+			}
 
-		t.Log(actualMessage)
+			t.Log(actualMessage)
+		}
 	}
 }
