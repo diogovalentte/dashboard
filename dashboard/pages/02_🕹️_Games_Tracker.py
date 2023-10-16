@@ -5,7 +5,7 @@ from datetime import date, datetime
 import streamlit as st
 from streamlit_calendar import calendar
 
-from dashboard.api.client import GameProperties, get_api_client
+from dashboard.api.client import get_api_client
 
 
 st.set_page_config(
@@ -57,8 +57,8 @@ class GamesTrackerPage:
             "<h1 style='text-align: center; font-size: 75px'>Games Tracker</h1>",
             unsafe_allow_html=True,
         )
-        to_be_released_tab, not_started_tab, finished_tab, dropped_tab = st.tabs(
-            ["To be released", "Not started", "Finished", "Dropped"]
+        to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_game_tab = st.tabs(
+            ["To be released", "Not started", "Finished", "Dropped", "Update game"]
         )
 
         with to_be_released_tab:
@@ -69,6 +69,8 @@ class GamesTrackerPage:
             self.show_finished_tab()
         with dropped_tab:
             self.show_dropped_tab()
+        with update_game_tab:
+            self.show_update_game_tab()
 
         self.sidebar()
 
@@ -150,6 +152,9 @@ class GamesTrackerPage:
     def show_dropped_tab(self):
         games = self.api_client.get_dropped_games()
         self.show_games(st.columns(5), games, self._show_dropped_game)
+
+    def show_update_game_tab(self):
+        self._show_update_game()
 
     def _show_to_be_released_game(
             self, game: dict,
@@ -372,21 +377,145 @@ class GamesTrackerPage:
                 if no_game_finished_dropped_date:
                     game_finished_dropped_date = None
 
-                game_properties = GameProperties(
-                    game_url,
-                    game_priority,
-                    game_status,
-                    purchased_or_gamepass,
-                    game_stars,
-                    game_started_date,
-                    game_finished_dropped_date,
-                    game_commentary,
-                )
+                game_properties = {
+                    "url": game_url,
+                    "priority": game_priority,
+                    "status": game_status,
+                    "stars": game_stars,
+                    "purchased_or_gamepass": purchased_or_gamepass,
+                    "started_date": str(game_started_date) if game_started_date is not None else "",
+                    "finished_dropped_date": str(game_finished_dropped_date) if game_finished_dropped_date is not None else "",
+                    "commentary": game_commentary
+                }
 
                 self.api_client.add_game(game_properties)
 
                 st.success("Game requested")
                 st.session_state["update_all_games"] = True
+
+    def _show_update_game(self):
+        games = self.api_client.get_all_games()
+
+        # Select game to update
+        selected_game = st.selectbox(
+            "Select a game to update",
+            options=games.keys(),
+            index=None,
+            placeholder="Choose a game",
+            key="update_game_on_games_tracker_database_select_game_to_update"
+        )
+        st.title("")
+        if selected_game is not None:
+            game = games[selected_game].copy()
+
+            game["Status"] = self._get_status(game["Status"])
+            game["Priority"] = self._get_priority(game["Priority"])
+            game["Stars"] = self._get_stars(game["Stars"])
+
+            release_date = datetime.strptime(game["ReleaseDate"], "%Y-%m-%dT%H:%M:%SZ")
+            game["ReleaseDate"] = date(release_date.year, release_date.month, release_date.day)
+
+            started_date = datetime.strptime(game["StartedDate"], "%Y-%m-%dT%H:%M:%SZ")
+            game["StartedDate"] = date(started_date.year, started_date.month, started_date.day)
+
+            finished_dropped_date = datetime.strptime(game["FinishedDroppedDate"], "%Y-%m-%dT%H:%M:%SZ")
+            game["FinishedDroppedDate"] = date(
+                finished_dropped_date.year,
+                finished_dropped_date.month,
+                finished_dropped_date.day
+            )
+
+            # Show update form
+            edit_form_container = st.container()
+            with st.expander("Update commentary"):
+                edited_commentary = self.show_markdown_editor(game["Commentary"])
+
+            with edit_form_container:
+                with st.form("update_game_on_games_tracker_database"):
+                    column_config = {
+                        "Priority": st.column_config.SelectboxColumn(
+                            options=self._game_priority_options.values(),
+                            required=True
+                        ),
+                        "Status": st.column_config.SelectboxColumn(
+                            options=self._game_status_options.values(),
+                            required=True
+                        ),
+                        "Stars": st.column_config.SelectboxColumn(
+                            options=self._game_stars_options.values(),
+                            required=True
+                        ),
+                        "PurchasedOrGamePass": st.column_config.CheckboxColumn(
+                            label="Purchased/Gamepass?",
+                            required=True,
+                            width="small"
+                        ),
+                        "StartedDate": st.column_config.DateColumn(
+                            label="Started date",
+                            required=True
+                        ),
+                        "FinishedDroppedDate": st.column_config.DateColumn(
+                            label="Finished/Dropped date",
+                            required=True
+                        ),
+                        "ReleaseDate": st.column_config.DateColumn(
+                            label="Release date",
+                            required=True
+                        )
+                    }
+                    column_order = (
+                        "Priority",
+                        "Status",
+                        "Stars",
+                        "PurchasedOrGamePass",
+                        "StartedDate",
+                        "FinishedDroppedDate",
+                        "ReleaseDate"
+                    )
+                    updated_game = st.data_editor(
+                        [game],
+                        use_container_width=True,
+                        column_order=column_order,
+                        column_config=column_config,
+                        key="update_game_on_games_tracker_database_data_editor",
+                    )[0]
+                    st.write("")
+
+                    if st.form_submit_button():
+                        game_priority = self._get_priority(updated_game["Priority"])
+                        game_status = self._get_status(updated_game["Status"])
+                        game_stars = self._get_stars(updated_game["Stars"])
+
+                        game_properties = {
+                            "name": game["Name"],
+                            "priority": game_priority,
+                            "status": game_status,
+                            "stars": game_stars,
+                            "purchased_or_gamepass": updated_game["PurchasedOrGamePass"],
+                            "started_date": str(updated_game["StartedDate"]) if updated_game["StartedDate"] is not None else "",
+                            "finished_dropped_date": str(updated_game["FinishedDroppedDate"]) if updated_game["FinishedDroppedDate"] is not None else "",
+                            "release_date": str(updated_game["ReleaseDate"]) if updated_game["ReleaseDate"] is not None else "",
+                            "commentary": edited_commentary
+                        }
+
+                        self.api_client.update_game(game_properties)
+
+                        st.success("Game update requested")
+                        st.session_state["update_all_games"] = True
+
+    def show_markdown_editor(self, original_body: str):
+        markdown_viewer_col, markdown_editor_col = st.columns(2)
+        with markdown_editor_col:
+            edited_body = st.text_area(
+                label="will be collapesed",
+                value=original_body,
+                label_visibility="collapsed",
+                key="update_game_on_games_tracker_database_markdown_editor"
+            )
+        with markdown_viewer_col:
+            st.markdown(edited_body)
+
+        return edited_body
 
 
 page = GamesTrackerPage()

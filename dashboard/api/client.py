@@ -36,39 +36,6 @@ class JSONBody:
         raise NotImplementedError()
 
 
-class GameProperties(JSONBody):
-    def __init__(
-        self,
-        URL: str,
-        priority: int,
-        status: int,
-        stars: int,
-        purchased_or_gamepass: str,
-        started_date: datetime.date | None = None,
-        finished_dropped_date: datetime.date | None = None,
-        commentary: str | None = None,
-    ) -> None:
-        self.game_properties = {
-            "url": URL,
-            "priority": priority,
-            "status": status,
-            "stars": stars,
-            "purchased_or_gamepass": purchased_or_gamepass,
-            "started_date": str(started_date) if started_date is not None else "",
-            "finished_dropped_date": str(finished_dropped_date)
-            if finished_dropped_date is not None
-            else "",
-            "commentary": commentary,
-        }
-
-    @property
-    def json(self) -> dict:
-        return self._get_json()
-
-    def _get_json(self) -> dict:
-        return self.game_properties
-
-
 class MediaProperties(JSONBody):
     def __init__(
         self,
@@ -229,15 +196,30 @@ class TrackersAPIClient:
                 res.text,
             )
 
-    def add_game(self, game_properties: GameProperties) -> None:
+    def add_game(self, game_properties: dict) -> None:
         path = "/v1/trackers/games_tracker/add_game"
         url = urljoin(self.base_url, path)
 
-        res = requests.post(url, json=game_properties.json)
+        res = requests.post(url, json=game_properties)
 
         if res.status_code not in self.acceptable_status_codes:
             raise APIException(
                 "error while adding game to games tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
+    def update_game(self, game_properties: dict) -> None:
+        path = "/v1/trackers/games_tracker/update_game"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json=game_properties)
+
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while updating game on the games tracker database",
                 url,
                 "POST",
                 res.status_code,

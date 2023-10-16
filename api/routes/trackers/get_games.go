@@ -17,7 +17,7 @@ func GetAllGames(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, cover_img, release_date, tags, developers, publishers, priority,
-  status, stars, purchased_or_gamepass, started_date, finished_dropped_date
+  status, stars, purchased_or_gamepass, started_date, finished_dropped_date, commentary
 FROM
   games_tracker;`,
 	)
@@ -35,7 +35,7 @@ func GetPlayingGames(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, cover_img, release_date, tags, developers, publishers, priority,
-  status, stars, purchased_or_gamepass, started_date, finished_dropped_date
+  status, stars, purchased_or_gamepass, started_date, finished_dropped_date, ""
 FROM
   games_tracker
 WHERE
@@ -70,7 +70,7 @@ func GetToBeReleasedGames(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, cover_img, release_date, tags, developers, publishers, priority,
-  status, stars, purchased_or_gamepass, started_date, finished_dropped_date
+  status, stars, purchased_or_gamepass, started_date, finished_dropped_date, ""
 FROM
   games_tracker
 WHERE
@@ -105,7 +105,7 @@ func GetNotStartedGames(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, cover_img, release_date, tags, developers, publishers, priority,
-  status, stars, purchased_or_gamepass, started_date, finished_dropped_date
+  status, stars, purchased_or_gamepass, started_date, finished_dropped_date, ""
 FROM
   games_tracker
 WHERE
@@ -131,7 +131,7 @@ func GetFinishedGames(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, cover_img, release_date, tags, developers, publishers, priority,
-  status, stars, purchased_or_gamepass, started_date, finished_dropped_date
+  status, stars, purchased_or_gamepass, started_date, finished_dropped_date, ""
 FROM
   games_tracker
 WHERE
@@ -166,7 +166,7 @@ func GetDroppedGames(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, cover_img, release_date, tags, developers, publishers, priority,
-  status, stars, purchased_or_gamepass, started_date, finished_dropped_date
+  status, stars, purchased_or_gamepass, started_date, finished_dropped_date, ""
 FROM
   games_tracker
 WHERE
@@ -235,7 +235,8 @@ func getGamesFromQuery(sqlQuery string) ([]*GameProperties, error) {
 			&gameProperties.Stars,
 			&gameProperties.PurchasedOrGamePass,
 			&gameProperties.StartedDate,
-			&gameProperties.FinishedDroppedDate)
+			&gameProperties.FinishedDroppedDate,
+			&gameProperties.Commentary)
 		if err != nil {
 			return nil, err
 		}

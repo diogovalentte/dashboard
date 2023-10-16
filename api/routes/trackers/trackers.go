@@ -13,6 +13,7 @@ func GamesTrackerRoutes(group *gin.RouterGroup) {
 	games_tracker_group := group.Group("/games_tracker")
 	{
 		games_tracker_group.POST("/add_game", AddGame)
+		games_tracker_group.POST("/update_game", UpdateGame)
 		games_tracker_group.GET("/get_all_games", GetAllGames)
 		games_tracker_group.GET("/get_playing_games", GetPlayingGames)
 		games_tracker_group.GET("/get_to_be_released_games", GetToBeReleasedGames)
@@ -45,8 +46,10 @@ func IsValidDate(fl validator.FieldLevel) bool {
 type StructDateFields interface {
 	GetStartedDateStr() string
 	GetFinishedDroppedDateStr() string
+	GetReleaseDateStr() string
 	SetStartedDate(time.Time)
 	SetFinishedDroppedDate(time.Time)
+	SetReleaseDate(time.Time)
 }
 
 func SetStructDateFields(input StructDateFields) error {
@@ -67,6 +70,14 @@ func SetStructDateFields(input StructDateFields) error {
 			return err
 		}
 		input.SetFinishedDroppedDate(finishedDroppedDate)
+	}
+	releaseDateStr := input.GetReleaseDateStr()
+	if releaseDateStr != "" {
+		releaseDate, err := time.Parse(layout, releaseDateStr)
+		if err != nil {
+			return err
+		}
+		input.SetReleaseDate(releaseDate)
 	}
 
 	return nil

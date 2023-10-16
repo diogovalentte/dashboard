@@ -43,7 +43,7 @@ func AddGame(c *gin.Context) {
 		}
 	}
 
-	var gameRequest GameRequest
+	var gameRequest AddGameRequest
 	if err := c.ShouldBindJSON(&gameRequest); err != nil {
 		err = fmt.Errorf("invalid JSON fields, refer to the API documentation")
 		currentJob.SetFailedState(err)
@@ -75,7 +75,7 @@ func AddGame(c *gin.Context) {
 	}
 }
 
-type GameRequest struct {
+type AddGameRequest struct {
 	Wait                   bool      `json:"wait" binding:"-"` // Wether the requester wants to wait for the task to be done before responding
 	URL                    string    `json:"url" binding:"required,http_url"`
 	Priority               int       `json:"priority" binding:"required"`
@@ -89,23 +89,29 @@ type GameRequest struct {
 	Commentary             string    `json:"commentary" binding:"-"`
 }
 
-func (gr *GameRequest) GetStartedDateStr() string {
+func (gr *AddGameRequest) GetStartedDateStr() string {
 	return gr.StartedDateStr
 }
 
-func (gr *GameRequest) GetFinishedDroppedDateStr() string {
+func (gr *AddGameRequest) GetFinishedDroppedDateStr() string {
 	return gr.FinishedDroppedDateStr
 }
 
-func (gr *GameRequest) SetStartedDate(startedDate time.Time) {
+func (gr *AddGameRequest) GetReleaseDateStr() string {
+	return ""
+}
+
+func (gr *AddGameRequest) SetStartedDate(startedDate time.Time) {
 	gr.StartedDate = startedDate
 }
 
-func (gr *GameRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
+func (gr *AddGameRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
 	gr.FinishedDroppedDate = finishedDroppedDate
 }
 
-func addGameTask(currentJob *job.Job, gameRequest *GameRequest, configs *util.Configs, c *gin.Context, wait bool) {
+func (gr *AddGameRequest) SetReleaseDate(releaseDate time.Time) {}
+
+func addGameTask(currentJob *job.Job, gameRequest *AddGameRequest, configs *util.Configs, c *gin.Context, wait bool) {
 	scrapedGameProperties, err := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, currentJob)
 	if err != nil {
 		currentJob.SetFailedState(err)
@@ -348,7 +354,7 @@ func getTextFromDisplayNoneElements(elems []selenium.WebElement, wd *selenium.We
 	return elemsText, nil
 }
 
-func getGameProperties(gr *GameRequest, sgp *ScrapedGameProperties) (*GameProperties, error) {
+func getGameProperties(gr *AddGameRequest, sgp *ScrapedGameProperties) (*GameProperties, error) {
 	coverImg, err := util.GetImageFromURL(sgp.CoverURL)
 	if err != nil {
 		return nil, err

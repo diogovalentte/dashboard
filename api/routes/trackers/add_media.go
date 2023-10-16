@@ -41,7 +41,7 @@ func AddMedia(c *gin.Context) {
 		}
 	}
 
-	var mediaRequest MediaRequest
+	var mediaRequest AddMediaRequest
 	if err := c.ShouldBindJSON(&mediaRequest); err != nil {
 		err = fmt.Errorf("invalid JSON fields, refer to the API documentation")
 		currentJob.SetFailedState(err)
@@ -73,7 +73,7 @@ func AddMedia(c *gin.Context) {
 	}
 }
 
-type MediaRequest struct {
+type AddMediaRequest struct {
 	Wait                   bool      `json:"wait" binding:"-"` // Wether the requester wants to wait for the task to be done before responding
 	URL                    string    `json:"url" binding:"required,http_url"`
 	MediaType              int       `json:"type" binding:"required"`
@@ -87,23 +87,29 @@ type MediaRequest struct {
 	Commentary             string    `json:"commentary" binding:"-"`
 }
 
-func (mr *MediaRequest) GetStartedDateStr() string {
+func (mr *AddMediaRequest) GetStartedDateStr() string {
 	return mr.StartedDateStr
 }
 
-func (mr *MediaRequest) GetFinishedDroppedDateStr() string {
+func (mr *AddMediaRequest) GetFinishedDroppedDateStr() string {
 	return mr.FinishedDroppedDateStr
 }
 
-func (mr *MediaRequest) SetStartedDate(startedDate time.Time) {
+func (mr *AddMediaRequest) GetReleaseDateStr() string {
+	return ""
+}
+
+func (mr *AddMediaRequest) SetStartedDate(startedDate time.Time) {
 	mr.StartedDate = startedDate
 }
 
-func (mr *MediaRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
+func (mr *AddMediaRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
 	mr.FinishedDroppedDate = finishedDroppedDate
 }
 
-func addMediaTask(currentJob *job.Job, mediaRequest *MediaRequest, configs *util.Configs, c *gin.Context, wait bool) {
+func (mr *AddMediaRequest) SetReleaseDate(releaseDate time.Time) {}
+
+func addMediaTask(currentJob *job.Job, mediaRequest *AddMediaRequest, configs *util.Configs, c *gin.Context, wait bool) {
 	scrapedMediaProperties, err := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, currentJob)
 	if err != nil {
 		currentJob.SetFailedState(err)
@@ -252,7 +258,7 @@ func mediaNameCondition(wd selenium.WebDriver) (bool, error) {
 	return true, nil
 }
 
-func getMediaProperties(mr *MediaRequest, smp *ScrapedMediaProperties) (*MediaProperties, error) {
+func getMediaProperties(mr *AddMediaRequest, smp *ScrapedMediaProperties) (*MediaProperties, error) {
 	coverImg, err := util.GetImageFromURL(smp.CoverURL)
 	if err != nil {
 		return nil, err
