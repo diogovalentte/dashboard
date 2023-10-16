@@ -196,6 +196,21 @@ class TrackersAPIClient:
                 res.text,
             )
 
+    def update_media(self, game_properties: dict) -> None:
+        path = "/v1/trackers/medias_tracker/update_media"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json=game_properties)
+
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while updating media on the medias tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
     def add_game(self, game_properties: dict) -> None:
         path = "/v1/trackers/games_tracker/add_game"
         url = urljoin(self.base_url, path)

@@ -55,15 +55,15 @@ class MediasTrackerPage:
             self.add_media()
         with st.sidebar.expander("Watching/Reading medias"):
             self.show_watching_reading_medias_tab()
-        self.api_client.show_all_jobs_updating()
+        # self.api_client.show_all_jobs_updating()
 
     def show(self):
         st.markdown(
             "<h1 style='text-align: center; font-size: 75px'>Medias Tracker</h1>",
             unsafe_allow_html=True,
         )
-        to_be_released_tab, not_started_tab, finished_tab, dropped_tab = st.tabs(
-            ["To be released", "Not started", "Finished", "Dropped"]
+        to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_media_tab = st.tabs(
+            ["To be released", "Not started", "Finished", "Dropped", "Update media"]
         )
 
         with to_be_released_tab:
@@ -74,6 +74,8 @@ class MediasTrackerPage:
             self.show_finished_tab()
         with dropped_tab:
             self.show_dropped_tab()
+        with update_media_tab:
+            self.show_update_media_tab()
 
         self.sidebar()
 
@@ -155,6 +157,9 @@ class MediasTrackerPage:
     def show_dropped_tab(self):
         medias = self.api_client.get_dropped_medias()
         self.show_medias(st.columns(10), medias, self._show_dropped_media)
+
+    def show_update_media_tab(self):
+        self._show_update_media()
 
     def _show_watching_reading_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
         st.subheader(media["Name"])
@@ -270,8 +275,8 @@ class MediasTrackerPage:
     def _get_status(self, status: int | str):
         correct_status = self._media_status_options.get(status, None)
         if correct_status is None:
-            game_status_options = {value: key for key, value in self._media_status_options.items()}
-            correct_status = game_status_options[status]
+            media_status_options = {value: key for key, value in self._media_status_options.items()}
+            correct_status = media_status_options[status]
 
         return correct_status
 
@@ -286,8 +291,8 @@ class MediasTrackerPage:
     def _get_stars(self, stars: int | str):
         correct_stars = self._media_stars_options.get(stars, None)
         if correct_stars is None:
-            game_stars_options = {value: key for key, value in self._media_stars_options.items()}
-            correct_stars = game_stars_options[stars]
+            media_stars_options = {value: key for key, value in self._media_stars_options.items()}
+            correct_stars = media_stars_options[stars]
 
         return correct_stars
 
@@ -395,6 +400,132 @@ class MediasTrackerPage:
                 self.api_client.add_media(media_properties)
 
                 st.success("Requested media page")
+
+
+    def _show_update_media(self):
+        medias = self.api_client.get_all_medias()
+
+        # Select media to update
+        selected_media = st.selectbox(
+            "Select a media to update",
+            options=medias.keys(),
+            index=None,
+            placeholder="Choose a media",
+            key="update_media_on_medias_tracker_database_select_media_to_update"
+        )
+        st.title("")
+        if selected_media is not None:
+            media = medias[selected_media].copy()
+
+            media["MediaType"] = self._get_media_type(media["MediaType"])
+            media["Status"] = self._get_status(media["Status"])
+            media["Priority"] = self._get_priority(media["Priority"])
+            media["Stars"] = self._get_stars(media["Stars"])
+
+            release_date = datetime.strptime(media["ReleaseDate"], "%Y-%m-%dT%H:%M:%SZ")
+            media["ReleaseDate"] = date(release_date.year, release_date.month, release_date.day)
+
+            started_date = datetime.strptime(media["StartedDate"], "%Y-%m-%dT%H:%M:%SZ")
+            media["StartedDate"] = date(started_date.year, started_date.month, started_date.day)
+
+            finished_dropped_date = datetime.strptime(media["FinishedDroppedDate"], "%Y-%m-%dT%H:%M:%SZ")
+            media["FinishedDroppedDate"] = date(
+                finished_dropped_date.year,
+                finished_dropped_date.month,
+                finished_dropped_date.day
+            )
+
+            # Show update form
+            edit_form_container = st.container()
+            with st.expander("Update commentary"):
+                edited_commentary = self.show_markdown_editor(media["Commentary"])
+
+            with edit_form_container:
+                with st.form("update_media_on_medias_tracker_database"):
+                    column_config = {
+                        "MediaType": st.column_config.SelectboxColumn(
+                            options=self._media_type_options.values(),
+                            required=True
+                        ),
+                        "Priority": st.column_config.SelectboxColumn(
+                            options=self._media_priority_options.values(),
+                            required=True
+                        ),
+                        "Status": st.column_config.SelectboxColumn(
+                            options=self._media_status_options.values(),
+                            required=True
+                        ),
+                        "Stars": st.column_config.SelectboxColumn(
+                            options=self._media_stars_options.values(),
+                            required=True
+                        ),
+                        "StartedDate": st.column_config.DateColumn(
+                            label="Started date",
+                            required=True
+                        ),
+                        "FinishedDroppedDate": st.column_config.DateColumn(
+                            label="Finished/Dropped date",
+                            required=True
+                        ),
+                        "ReleaseDate": st.column_config.DateColumn(
+                            label="Release date",
+                            required=True
+                        )
+                    }
+                    column_order = (
+                        "MediaType",
+                        "Priority",
+                        "Status",
+                        "Stars",
+                        "StartedDate",
+                        "FinishedDroppedDate",
+                        "ReleaseDate"
+                    )
+                    updated_media = st.data_editor(
+                        [media],
+                        use_container_width=True,
+                        column_order=column_order,
+                        column_config=column_config,
+                        key="update_media_on_medias_tracker_database_data_editor",
+                    )[0]
+                    st.write("")
+
+                    if st.form_submit_button():
+                        media_type = self._get_media_type(updated_media["MediaType"])
+                        media_priority = self._get_priority(updated_media["Priority"])
+                        media_status = self._get_status(updated_media["Status"])
+                        media_stars = self._get_stars(updated_media["Stars"])
+
+                        media_properties = {
+                            "name": media["Name"],
+                            "media_type": media_type,
+                            "priority": media_priority,
+                            "status": media_status,
+                            "stars": media_stars,
+                            "started_date": str(updated_media["StartedDate"]) if updated_media["StartedDate"] is not None else "",
+                            "finished_dropped_date": str(updated_media["FinishedDroppedDate"]) if updated_media["FinishedDroppedDate"] is not None else "",
+                            "release_date": str(updated_media["ReleaseDate"]) if updated_media["ReleaseDate"] is not None else "",
+                            "commentary": edited_commentary
+                        }
+
+                        self.api_client.update_media(media_properties)
+
+                        st.success("Media update requested")
+                        st.session_state["update_all_medias"] = True
+
+    def show_markdown_editor(self, original_body: str):
+        markdown_viewer_col, markdown_editor_col = st.columns(2)
+        with markdown_editor_col:
+            edited_body = st.text_area(
+                label="will be collapsed",
+                value=original_body,
+                label_visibility="collapsed",
+                key="update_media_on_medias_tracker_database_markdown_editor"
+            )
+        with markdown_viewer_col:
+            st.markdown(edited_body)
+
+        return edited_body
 
 
 page = MediasTrackerPage()

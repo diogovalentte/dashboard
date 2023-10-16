@@ -18,7 +18,8 @@ import (
 func TestGetMediaMetadata(t *testing.T) {
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
-		panic(err)
+		t.Error(err)
+		return
 	}
 
 	expected := trackers.ScrapedMediaProperties{
@@ -33,16 +34,18 @@ func TestGetMediaMetadata(t *testing.T) {
 	actual, err := trackers.GetMediaMetadata(mediaURL, configs.Firefox.BinaryPath, &job.Job{})
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if !reflect.DeepEqual(expected, *actual) {
 		t.Errorf("expected: %s, actual: %s", expected, *actual)
+		return
 	}
 
 	t.Logf("Media scraped: %s", actual.Name)
 }
 
-var addMediaRouteTestTable = []*trackers.MediaRequest{
+var addMediaRouteTestTable = []*trackers.AddMediaRequest{
 	{
 		Wait:      true,
 		MediaType: 3,
@@ -54,8 +57,8 @@ var addMediaRouteTestTable = []*trackers.MediaRequest{
 		Wait:                   true,
 		URL:                    "https://www.imdb.com/title/tt1586680",
 		MediaType:              1,
-		Priority:               1,
-		Status:                 1,
+		Priority:               2,
+		Status:                 3,
 		Stars:                  5,
 		StartedDateStr:         "2022-12-01",
 		FinishedDroppedDateStr: "2023-01-05",
@@ -81,12 +84,14 @@ func TestAddMediaRoute(t *testing.T) {
 		requestBody, err := json.Marshal(mediaRequest)
 		if err != nil {
 			t.Error(err)
+			continue
 		}
 
 		w := httptest.NewRecorder()
 		req, err := http.NewRequest(http.MethodPost, "/v1/trackers/medias_tracker/add_media", bytes.NewBuffer(requestBody))
 		if err != nil {
 			t.Error(err)
+			continue
 		}
 		router.ServeHTTP(w, req)
 
@@ -94,21 +99,33 @@ func TestAddMediaRoute(t *testing.T) {
 		jsonBytes := w.Body.Bytes()
 		if err := json.Unmarshal(jsonBytes, &resMap); err != nil {
 			t.Error(err)
-		}
-
-		if http.StatusOK != w.Code {
-			t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
+			continue
 		}
 
 		expectedMessage := "Media inserted into DB"
 		actualMessage, exists := resMap["message"]
-		if !exists {
-			t.Error(`Response body has no field "message"`)
-		}
-		if actualMessage != expectedMessage {
-			t.Errorf(`expected message: %s, actual message: %s`, expectedMessage, actualMessage)
-		}
+		if http.StatusOK != w.Code {
+			if !exists {
+				t.Error(`Response body has no field "message"`)
+				continue
+			}
+			if actualMessage == "UNIQUE constraint failed: medias_tracker.name" {
+				t.Log("Game already in database")
+				continue
+			} else {
+				t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
+				t.Errorf(`expected message: %s, actual message: %s`, expectedMessage, actualMessage)
+				continue
+			}
+		} else {
+			if !exists {
+				t.Error(`Response body has no field "message"`)
+			}
+			if actualMessage != expectedMessage {
+				t.Errorf(`expected message: %s, actual message: %s`, expectedMessage, actualMessage)
+			}
 
-		t.Log(actualMessage)
+			t.Log(actualMessage)
+		}
 	}
 }
