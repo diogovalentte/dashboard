@@ -52,7 +52,7 @@ func UpdateGame(c *gin.Context) {
 		return
 	}
 
-	// Get game info from a web store and create the game trackers page
+	// Update media on DB
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
 		currentJob.SetFailedState(err)
@@ -60,7 +60,6 @@ func UpdateGame(c *gin.Context) {
 		return
 	}
 
-	// Get game info from a web store and create the game trackers page
 	if !gameRequest.Wait {
 		go updateGameTask(&currentJob, &gameRequest, configs, c, gameRequest.Wait)
 		c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
