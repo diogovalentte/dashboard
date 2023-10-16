@@ -55,7 +55,7 @@ class MediasTrackerPage:
             self.add_media()
         with st.sidebar.expander("Watching/Reading medias"):
             self.show_watching_reading_medias_tab()
-        # self.api_client.show_all_jobs_updating()
+        self.api_client.show_all_jobs_updating()
 
     def show(self):
         st.markdown(
