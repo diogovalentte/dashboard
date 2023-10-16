@@ -12,11 +12,47 @@ import (
 	"time"
 )
 
+func GetMedia(c *gin.Context) {
+	// Validate request
+	var mediaRequest GetMediaRequest
+	if err := c.ShouldBindJSON(&mediaRequest); err != nil {
+		err = fmt.Errorf("invalid JSON fields, refer to the API documentation")
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	// Get game
+	sqlQuery := fmt.Sprintf(`
+SELECT
+  url, name, media_type, cover_img, release_date, genres, staff,
+  priority, status, stars, started_date, finished_dropped_date, commentary
+FROM
+  medias_tracker
+WHERE
+  name = '%s';`, mediaRequest.Name,
+	)
+
+	medias, err := getMediasFromQuery(sqlQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err})
+		return
+	}
+	if len(medias) < 1 {
+		c.JSON(http.StatusNotFound, gin.H{"message": "media do not exists"})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"media": medias[0]})
+}
+
+type GetMediaRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
 func GetAllMedias(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, media_type, cover_img, release_date, genres, staff,
-  priority, status, stars, started_date, finished_dropped_date
+  priority, status, stars, started_date, finished_dropped_date, ""
 FROM
   medias_tracker;`,
 	)
@@ -34,7 +70,7 @@ func GetWatchingReadingMedias(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, media_type, cover_img, release_date, genres, staff,
-  priority, status, stars, started_date, finished_dropped_date
+  priority, status, stars, started_date, finished_dropped_date, ""
 FROM
   medias_tracker
 WHERE
@@ -69,7 +105,7 @@ func GetToBeReleasedMedias(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, media_type, cover_img, release_date, genres, staff,
-  priority, status, stars, started_date, finished_dropped_date
+  priority, status, stars, started_date, finished_dropped_date, ""
 FROM
   medias_tracker
 WHERE
@@ -104,7 +140,7 @@ func GetNotStartedMedias(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, media_type, cover_img, release_date, genres, staff,
-  priority, status, stars, started_date, finished_dropped_date
+  priority, status, stars, started_date, finished_dropped_date, ""
 FROM
   medias_tracker
 WHERE
@@ -130,7 +166,7 @@ func GetFinishedMedias(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, media_type, cover_img, release_date, genres, staff,
-  priority, status, stars, started_date, finished_dropped_date
+  priority, status, stars, started_date, finished_dropped_date, ""
 FROM
   medias_tracker
 WHERE
@@ -165,7 +201,7 @@ func GetDroppedMedias(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, media_type, cover_img, release_date, genres, staff,
-  priority, status, stars, started_date, finished_dropped_date
+  priority, status, stars, started_date, finished_dropped_date, ""
 FROM
   medias_tracker
 WHERE
@@ -232,7 +268,8 @@ func getMediasFromQuery(sqlQuery string) ([]*MediaProperties, error) {
 			&mediaProperties.Status,
 			&mediaProperties.Stars,
 			&mediaProperties.StartedDate,
-			&mediaProperties.FinishedDroppedDate)
+			&mediaProperties.FinishedDroppedDate,
+			&mediaProperties.Commentary)
 		if err != nil {
 			return nil, err
 		}
