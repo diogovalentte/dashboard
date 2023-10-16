@@ -18,7 +18,8 @@ import (
 func TestGetGameMetadata(t *testing.T) {
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
-		panic(err)
+		t.Error(err)
+		return
 	}
 
 	expected := trackers.ScrapedGameProperties{
