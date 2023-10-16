@@ -17,16 +17,32 @@ st.set_page_config(
 class MediasTrackerPage:
     def __init__(self) -> None:
         self.api_client = get_api_client()
-        self.media_priority_options = {
-            "High": "🤩 High",
-            "Medium": "😆 Medium",
-            "Low": "🙂 Low"
+        self._media_priority_options = {
+            1: "🤩 High",
+            2: "😆 Medium",
+            3: "🙂 Low"
         }
-        self.media_type_options = {
-            "📺 Series": "Series",
-            "🍿 Movie": "Movie",
-            "📖 Book": "Book",
-            "🗯️ Comic book": "Comic book",
+        self._media_status_options = {
+            1: "🗂️ Not started",
+            2: "📅 To be released",
+            3: "🍿 Watching/Reading",
+            4: "✅ Finished",
+            5: "❌ Dropped",
+        }
+        self._media_type_options = {
+            1: "📺 Series",
+            2: "🍿 Movie",
+            3: "📖 Book",
+            4: "🗯️ Comic book",
+        }
+        star = "⭐"
+        self._media_stars_options = {
+            0: "I haven't decided",
+            1: star,
+            2: f"{star * 2}",
+            3: f"{star * 3}",
+            4: f"{star * 4}",
+            5: f"{star * 5}",
         }
 
     def sidebar(self):
@@ -237,40 +253,43 @@ class MediasTrackerPage:
                 st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
 
-    def _get_stars(self, stars: int):
-        star = "⭐"
-        stars_dict = {
-            0: "No stars",
-            1: star,
-            2: star*2,
-            3: star*3,
-            4: star*4,
-            5: star*5,
-        }
-
-        return stars_dict[stars]
-
     def _get_date(self, date_str: str):
         if date_str == "0001-01-01T00:00:00Z":
             return None
         else:
             return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%B %d, %Y")
 
-    def _get_priority(self, priority: str):
-        correct_priority = self.media_priority_options.get(priority, None)
+    def _get_priority(self, priority: int | str):
+        correct_priority = self._media_priority_options.get(priority, None)
         if correct_priority is None:
-            media_priority_options = {value: key for key, value in self.media_priority_options.items()}
+            media_priority_options = {value: key for key, value in self._media_priority_options.items()}
             correct_priority = media_priority_options[priority]
 
         return correct_priority
 
-    def _get_media_type(self, media_type: str):
-        correct_media_type = self.media_type_options.get(media_type, None)
+    def _get_status(self, status: int | str):
+        correct_status = self._media_status_options.get(status, None)
+        if correct_status is None:
+            game_status_options = {value: key for key, value in self._media_status_options.items()}
+            correct_status = game_status_options[status]
+
+        return correct_status
+
+    def _get_media_type(self, media_type: int | str):
+        correct_media_type = self._media_type_options.get(media_type, None)
         if correct_media_type is None:
-            media_type_options = {value: key for key, value in self.media_type_options.items()}
+            media_type_options = {value: key for key, value in self._media_type_options.items()}
             correct_media_type = media_type_options[media_type]
 
         return correct_media_type
+
+    def _get_stars(self, stars: int | str):
+        correct_stars = self._media_stars_options.get(stars, None)
+        if correct_stars is None:
+            game_stars_options = {value: key for key, value in self._media_stars_options.items()}
+            correct_stars = game_stars_options[stars]
+
+        return correct_stars
 
     def show_medias(self, cols_list: list, medias: dict, show_media_func):
         """Show medias in expanders in the cols_list columns.
@@ -300,47 +319,27 @@ class MediasTrackerPage:
 
             selected_media_type = st.selectbox(
                 "Type",
-                options=self.media_type_options.keys(),
+                options=self._media_type_options.values(),
                 key="add_media_to_medias_tracker_database_media_type",
             )
-            media_type = self._get_media_type(selected_media_type)
 
-            media_priority = st.selectbox(
+            selected_media_priority = st.selectbox(
                 "Priority",
-                options=self.media_priority_options.values(),
+                options=self._media_priority_options.values(),
                 key="add_media_to_medias_tracker_database_media_priority",
             )
-            media_priority = self._get_priority(media_priority)
 
-            media_status_options = {
-                "🗂️ Not started": "Not started",
-                "📅 To be released": "To be released",
-                "🍿 Watching/Reading": "Watching/Reading",
-                "❌ Dropped": "Dropped",
-                "✅ Finished": "Finished",
-            }
             selected_media_status = st.selectbox(
                 "Status",
-                options=media_status_options.keys(),
+                options=self._media_status_options.values(),
                 key="add_media_to_medias_tracker_database_media_status",
             )
-            media_status = media_status_options[selected_media_status]
 
-            star = "⭐"
-            media_star_options = {
-                "I haven't decided": None,
-                star: 1,
-                f"{star * 2}": 2,
-                f"{star * 3}": 3,
-                f"{star * 4}": 4,
-                f"{star * 5}": 5,
-            }
-            selected_media_star = st.selectbox(
+            selected_media_stars = st.selectbox(
                 "Stars",
-                options=media_star_options.keys(),
+                options=self._media_stars_options.values(),
                 key="add_media_to_medias_tracker_database_media_stars",
             )
-            media_stars = media_star_options[selected_media_star]
 
             st.divider()
             media_started_date = st.date_input(
@@ -373,6 +372,10 @@ class MediasTrackerPage:
             submitted = st.form_submit_button()
 
             if submitted:
+                media_type = self._get_media_type(selected_media_type)
+                media_priority = self._get_priority(selected_media_priority)
+                media_status = self._get_status(selected_media_status)
+                media_stars = self._get_stars(selected_media_stars)
                 if no_media_started_date:
                     media_started_date = None
                 if no_media_finished_dropped_date:

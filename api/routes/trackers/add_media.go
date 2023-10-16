@@ -76,9 +76,9 @@ func AddMedia(c *gin.Context) {
 type MediaRequest struct {
 	Wait                   bool      `json:"wait" binding:"-"` // Wether the requester wants to wait for the task to be done before responding
 	URL                    string    `json:"url" binding:"required,http_url"`
-	MediaType              string    `json:"type" binding:"required"`
-	Priority               string    `json:"priority" binding:"required"`
-	Status                 string    `json:"status" binding:"required"`
+	MediaType              int       `json:"type" binding:"required"`
+	Priority               int       `json:"priority" binding:"required"`
+	Status                 int       `json:"status" binding:"required"`
 	Stars                  int       `json:"stars" binding:"omitempty,gte=0,lte=5"`
 	StartedDateStr         string    `json:"started_date" binding:"omitempty,IsValidDate"`
 	StartedDate            time.Time `binding:"-"`
@@ -281,15 +281,15 @@ func getMediaProperties(mr *MediaRequest, smp *ScrapedMediaProperties) (*MediaPr
 type MediaProperties struct {
 	Name                string
 	URL                 string
-	MediaType           string
+	MediaType           int
 	CoverImg            []byte
 	ReleaseDate         time.Time
 	GenresStr           string
 	Genres              []string
 	StaffStr            string
 	Staff               []string
-	Priority            string
-	Status              string
+	Priority            int
+	Status              int
 	Stars               int
 	StartedDate         time.Time
 	FinishedDroppedDate time.Time
