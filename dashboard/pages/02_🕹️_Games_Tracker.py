@@ -507,7 +507,7 @@ class GamesTrackerPage:
         markdown_viewer_col, markdown_editor_col = st.columns(2)
         with markdown_editor_col:
             edited_body = st.text_area(
-                label="will be collapesed",
+                label="will be collapsed",
                 value=original_body,
                 label_visibility="collapsed",
                 key="update_game_on_games_tracker_database_markdown_editor"
