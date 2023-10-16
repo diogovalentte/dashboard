@@ -13,6 +13,42 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func GetGame(c *gin.Context) {
+	// Validate request
+	var gameRequest GetGameRequest
+	if err := c.ShouldBindJSON(&gameRequest); err != nil {
+		err = fmt.Errorf("invalid JSON fields, refer to the API documentation")
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	// Get game
+	sqlQuery := fmt.Sprintf(`
+SELECT
+  url, name, cover_img, release_date, tags, developers, publishers, priority,
+  status, stars, purchased_or_gamepass, started_date, finished_dropped_date, commentary
+FROM
+  games_tracker
+WHERE
+  name = '%s';`, gameRequest.Name,
+	)
+
+	games, err := getGamesFromQuery(sqlQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err})
+		return
+	}
+	if len(games) < 1 {
+		c.JSON(http.StatusNotFound, gin.H{"message": "game do not exists"})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"game": games[0]})
+}
+
+type GetGameRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
 func GetAllGames(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
