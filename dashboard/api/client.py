@@ -36,39 +36,6 @@ class JSONBody:
         raise NotImplementedError()
 
 
-class MediaProperties(JSONBody):
-    def __init__(
-        self,
-        URL: str,
-        media_type: int,
-        priority: int,
-        status: int,
-        stars: int,
-        started_date: datetime.date | None = None,
-        finished_dropped_date: datetime.date | None = None,
-        commentary: str | None = None,
-    ) -> None:
-        self.media_properties = {
-            "url": URL,
-            "type": media_type,
-            "priority": priority,
-            "status": status,
-            "stars": stars,
-            "started_date": str(started_date) if started_date is not None else "",
-            "finished_dropped_date": str(finished_dropped_date)
-            if finished_dropped_date is not None
-            else "",
-            "commentary": commentary,
-        }
-
-    @property
-    def json(self) -> dict:
-        return self._get_json()
-
-    def _get_json(self) -> dict:
-        return self.media_properties
-
-
 class SystemAPIClient:
     def __init__(self) -> None:
         self.base_url: str = ""
@@ -181,11 +148,11 @@ class TrackersAPIClient:
         self.base_url: str = ""
         self.acceptable_status_codes: tuple = ()
 
-    def add_media(self, media_properties: MediaProperties) -> None:
+    def add_media(self, media_properties: dict) -> None:
         path = "/v1/trackers/medias_tracker/add_media"
         url = urljoin(self.base_url, path)
 
-        res = requests.post(url, json=media_properties.json)
+        res = requests.post(url, json=media_properties)
 
         if res.status_code not in self.acceptable_status_codes:
             raise APIException(

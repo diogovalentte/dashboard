@@ -5,7 +5,7 @@ from datetime import date, datetime
 import streamlit as st
 from streamlit_calendar import calendar
 
-from dashboard.api.client import MediaProperties, get_api_client
+from dashboard.api.client import get_api_client
 
 st.set_page_config(
     page_title="Medias Tracker",
@@ -386,16 +386,16 @@ class MediasTrackerPage:
                 if no_media_finished_dropped_date:
                     media_finished_dropped_date = None
 
-                media_properties = MediaProperties(
-                    media_url,
-                    media_type,
-                    media_priority,
-                    media_status,
-                    media_stars,
-                    media_started_date,
-                    media_finished_dropped_date,
-                    media_commentary,
-                )
+                media_properties = {
+                    "url": media_url,
+                    "media_type": media_type,
+                    "priority": media_priority,
+                    "status": media_status,
+                    "stars": media_stars,
+                    "started_date": media_started_date,
+                    "finished_dropped_date": media_finished_dropped_date,
+                    "commentary": media_commentary
+                }
 
                 self.api_client.add_media(media_properties)
 
