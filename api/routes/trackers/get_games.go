@@ -39,7 +39,7 @@ SELECT
 FROM
   games_tracker
 WHERE
-  status = 'Playing'
+  status = 3
 ORDER BY
   started_date DESC;`,
 	)
@@ -74,7 +74,7 @@ SELECT
 FROM
   games_tracker
 WHERE
-  status = 'To be released'
+  status = 1
 ORDER BY
   release_date;`,
 	)
@@ -109,12 +109,12 @@ SELECT
 FROM
   games_tracker
 WHERE
-  status = 'Not started'
+  status = 2
 ORDER BY
   CASE
-    WHEN priority = 'High' THEN 1
-    WHEN priority = 'Medium' THEN 2
-    WHEN priority = 'Low' THEN 3
+    WHEN priority = 1 THEN 1
+    WHEN priority = 2 THEN 2
+    WHEN priority = 3 THEN 3
   END;`,
 	)
 
@@ -135,7 +135,7 @@ SELECT
 FROM
   games_tracker
 WHERE
-  status = 'Finished'
+  status = 4
 ORDER BY
   finished_dropped_date DESC;`,
 	)
@@ -170,7 +170,7 @@ SELECT
 FROM
   games_tracker
 WHERE
-  status = 'Dropped'
+  status = 5
 ORDER BY
   finished_dropped_date DESC;`,
 	)

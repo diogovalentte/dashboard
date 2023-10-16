@@ -78,8 +78,8 @@ func AddGame(c *gin.Context) {
 type GameRequest struct {
 	Wait                   bool      `json:"wait" binding:"-"` // Wether the requester wants to wait for the task to be done before responding
 	URL                    string    `json:"url" binding:"required,http_url"`
-	Priority               string    `json:"priority" binding:"required"`
-	Status                 string    `json:"status" binding:"required"`
+	Priority               int       `json:"priority" binding:"required"`
+	Status                 int       `json:"status" binding:"required"`
 	PurchasedGamePass      bool      `json:"purchased_or_gamepass" binding:"-"`
 	Stars                  int       `json:"stars" binding:"omitempty,gte=0,lte=5"`
 	StartedDateStr         string    `json:"started_date" binding:"omitempty,IsValidDate"`
@@ -387,8 +387,8 @@ type GameProperties struct {
 	Developers          []string
 	PublishersStr       string
 	Publishers          []string
-	Priority            string
-	Status              string
+	Priority            int
+	Status              int
 	Stars               int
 	PurchasedOrGamePass bool
 	StartedDate         time.Time

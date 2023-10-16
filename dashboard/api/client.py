@@ -40,10 +40,10 @@ class GameProperties(JSONBody):
     def __init__(
         self,
         URL: str,
-        priority: str,
-        status: str,
+        priority: int,
+        status: int,
+        stars: int,
         purchased_or_gamepass: str,
-        stars: str,
         started_date: datetime.date | None = None,
         finished_dropped_date: datetime.date | None = None,
         commentary: str | None = None,
@@ -52,8 +52,8 @@ class GameProperties(JSONBody):
             "url": URL,
             "priority": priority,
             "status": status,
-            "purchased_or_gamepass": purchased_or_gamepass,
             "stars": stars,
+            "purchased_or_gamepass": purchased_or_gamepass,
             "started_date": str(started_date) if started_date is not None else "",
             "finished_dropped_date": str(finished_dropped_date)
             if finished_dropped_date is not None

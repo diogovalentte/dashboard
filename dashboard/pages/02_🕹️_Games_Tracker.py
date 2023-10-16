@@ -7,6 +7,7 @@ from streamlit_calendar import calendar
 
 from dashboard.api.client import GameProperties, get_api_client
 
+
 st.set_page_config(
     page_title="Games Tracker",
     page_icon="🕹️",
@@ -17,10 +18,26 @@ st.set_page_config(
 class GamesTrackerPage:
     def __init__(self) -> None:
         self.api_client = get_api_client()
-        self.game_priority_options = {
-            "High": "🤩 High",
-            "Medium": "😆 Medium",
-            "Low": "🙂 Low"
+        self._game_priority_options = {
+            1: "🤩 High",
+            2: "😆 Medium",
+            3: "🙂 Low"
+        }
+        self._game_status_options = {
+            1: "📅 To be released",
+            2: "🗂️ Not started",
+            3: "🎮 Playing",
+            4: "✅ Finished",
+            5: "❌ Dropped",
+        }
+        star = "⭐"
+        self._game_stars_options = {
+            0: "I haven't decided",
+            1: star,
+            2: f"{star * 2}",
+            3: f"{star * 3}",
+            4: f"{star * 4}",
+            5: f"{star * 5}",
         }
 
     def sidebar(self):
@@ -177,7 +194,6 @@ class GamesTrackerPage:
                 st.rerun()
         st.divider()
 
-
     def _show_not_started_game(self, game: dict, games: dict, show_highlight_button: bool = True):
         img_bytes = base64.b64decode(game["CoverImg"])
         img_stream = BytesIO(img_bytes)
@@ -238,32 +254,35 @@ class GamesTrackerPage:
 
         return purchased_or_gamepass
 
-    def _get_stars(self, stars: int):
-        star = "⭐"
-        stars_dict = {
-            0: "No stars",
-            1: star,
-            2: star*2,
-            3: star*3,
-            4: star*4,
-            5: star*5,
-        }
-
-        return stars_dict[stars]
-
     def _get_date(self, date_str: str):
         if date_str == "0001-01-01T00:00:00Z":
             return None
         else:
             return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%B %d, %Y")
 
-    def _get_priority(self, priority: str):
-        correct_priority = self.game_priority_options.get(priority, None)
+    def _get_priority(self, priority: int | str):
+        correct_priority = self._game_priority_options.get(priority, None)
         if correct_priority is None:
-            game_priority_options = {value: key for key, value in self.game_priority_options.items()}
+            game_priority_options = {value: key for key, value in self._game_priority_options.items()}
             correct_priority = game_priority_options[priority]
 
         return correct_priority
+
+    def _get_stars(self, stars: int | str):
+        correct_stars = self._game_stars_options.get(stars, None)
+        if correct_stars is None:
+            game_stars_options = {value: key for key, value in self._game_stars_options.items()}
+            correct_stars = game_stars_options[stars]
+
+        return correct_stars
+
+    def _get_status(self, status: int | str):
+        correct_status = self._game_status_options.get(status, None)
+        if correct_status is None:
+            game_status_options = {value: key for key, value in self._game_status_options.items()}
+            correct_status = game_status_options[status]
+
+        return correct_status
 
     def show_games(self, cols_list: list, games: dict, show_games_func):
         """Show games in expanders in the cols_list columns.
@@ -290,46 +309,27 @@ class GamesTrackerPage:
                 placeholder="https://store.steampowered.com/app/753640/Outer_Wilds/",
             )
 
-            game_priority = st.selectbox(
+            selected_game_priority = st.selectbox(
                 "Priority",
-                options=({value: key for key, value in self.game_priority_options.items()}).keys(),
+                options=self._game_priority_options.values(),
                 key="add_game_to_games_tracker_database_game_priority",
             )
-            game_priority = self._get_priority(game_priority)
 
-            game_status_options = {
-                "🗂️ Not started": "Not started",
-                "📅 To be released": "To be released",
-                "🎮 Playing": "Playing",
-                "❌ Dropped": "Dropped",
-                "✅ Finished": "Finished",
-            }
             selected_game_status = st.selectbox(
                 "Status",
-                options=game_status_options.keys(),
+                options=self._game_status_options.values(),
                 key="add_game_to_games_tracker_database_game_status",
             )
-            game_status = game_status_options[selected_game_status]
 
-            star = "⭐"
-            game_star_options = {
-                "I haven't decided": None,
-                star: 1,
-                f"{star * 2}": 2,
-                f"{star * 3}": 3,
-                f"{star * 4}": 4,
-                f"{star * 5}": 5,
-            }
-            selected_game_star = st.selectbox(
+            selected_game_stars = st.selectbox(
                 "Stars",
-                options=game_star_options.keys(),
+                options=self._game_stars_options.values(),
                 key="add_game_to_games_tracker_database_game_stars",
             )
-            game_stars = game_star_options[selected_game_star]
 
             st.write("")
             purchased_or_gamepass = st.checkbox(
-                "Already purchased/in Gamepass",
+                "Already purchased/in Gamepass?",
                 key="add_game_to_games_tracker_database_game_purchased_gamepass",
             )
 
@@ -364,6 +364,9 @@ class GamesTrackerPage:
             submitted = st.form_submit_button()
 
             if submitted:
+                game_priority = self._get_priority(selected_game_priority)
+                game_status = self._get_status(selected_game_status)
+                game_stars = self._get_stars(selected_game_stars)
                 if no_game_started_date:
                     game_started_date = None
                 if no_game_finished_dropped_date:

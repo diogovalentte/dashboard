@@ -47,8 +47,8 @@ var addGameRouteTestTable = []*trackers.GameRequest{
 	{
 		Wait:                   true,
 		URL:                    "https://store.steampowered.com/app/105600/Terraria/",
-		Priority:               "Low",
-		Status:                 "Playing",
+		Priority:               3,
+		Status:                 3,
 		PurchasedGamePass:      false,
 		Stars:                  3,
 		StartedDateStr:         "2023-01-01",
@@ -58,8 +58,8 @@ var addGameRouteTestTable = []*trackers.GameRequest{
 	{
 		Wait:                   true,
 		URL:                    "https://store.steampowered.com/app/1174180/Red_Dead_Redemption_2/?l=brazilian",
-		Priority:               "High",
-		Status:                 "Finished",
+		Priority:               1,
+		Status:                 5,
 		PurchasedGamePass:      true,
 		Stars:                  5,
 		StartedDateStr:         "2022-12-01",
@@ -69,8 +69,8 @@ var addGameRouteTestTable = []*trackers.GameRequest{
 	{
 		Wait:                   true,
 		URL:                    "https://store.steampowered.com/app/1282100/Remnant_II/",
-		Priority:               "Medium",
-		Status:                 "Playing",
+		Priority:               2,
+		Status:                 3,
 		PurchasedGamePass:      false,
 		Stars:                  5,
 		StartedDateStr:         "2023-07-29",
