@@ -208,6 +208,26 @@ class TrackersAPIClient:
                 res.text,
             )
 
+    def get_game(
+            self, name: str
+    ):
+        path = "/v1/trackers/games_tracker/get_game"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json={"name": name})
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                f"error while getting the game '{name}' from the games tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
+        game = res.json().get("game")
+
+        return game
+
     def get_all_games(
         self
     ):

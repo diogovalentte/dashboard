@@ -1,9 +1,11 @@
 import base64
+import random
 from io import BytesIO
 from datetime import date, datetime
 
 import streamlit as st
 from streamlit_calendar import calendar
+from streamlit_extras.tags import tagger_component
 
 from dashboard.api.client import get_api_client
 
@@ -41,11 +43,6 @@ class GamesTrackerPage:
         }
 
     def sidebar(self):
-        # Show a game highlighted in the sidebar
-        with st.sidebar.container():
-            if (highlight_game := st.session_state.get("game_to_be_highlighted", None)) is not None:
-                with st.expander(highlight_game["Name"], True):
-                    self._show_to_be_released_game(highlight_game, {}, False)
         with st.sidebar.expander("Add a game"):
             self.add_game()
         with st.sidebar.expander("Playing games"):
@@ -57,9 +54,16 @@ class GamesTrackerPage:
             "<h1 style='text-align: center; font-size: 75px'>Games Tracker</h1>",
             unsafe_allow_html=True,
         )
-        to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_game_tab = st.tabs(
-            ["To be released", "Not started", "Finished", "Dropped", "Update game"]
-        )
+
+        if (highlight_game := st.session_state.get("game_to_be_highlighted", None)) is not None:
+            to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_game_tab, highlight_game_tab = st.tabs(
+                ["To be released", "Not started", "Finished", "Dropped", "Update game", highlight_game["Name"]]
+            )
+        else:
+            to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_game_tab = st.tabs(
+                ["To be released", "Not started", "Finished", "Dropped", "Update game"]
+            )
+
 
         with to_be_released_tab:
             self.show_to_be_released_tab()
@@ -71,6 +75,9 @@ class GamesTrackerPage:
             self.show_dropped_tab()
         with update_game_tab:
             self.show_update_game_tab()
+        if highlight_game is not None:
+            with highlight_game_tab:
+                self.show_highlighted_game_tab()
 
         self.sidebar()
 
@@ -155,6 +162,11 @@ class GamesTrackerPage:
 
     def show_update_game_tab(self):
         self._show_update_game()
+
+    def show_highlighted_game_tab(self):
+        highlighted_game_name = st.session_state["game_name_to_be_highlighted"]
+        game = self.api_client.get_game(highlighted_game_name)
+        self._show_highlighted_game(game)
 
     def _show_to_be_released_game(
             self, game: dict,
@@ -251,6 +263,70 @@ class GamesTrackerPage:
                 st.session_state["game_to_be_highlighted"] = games[game_name]
                 st.rerun()
 
+    def _show_highlighted_game(self, game: dict):
+        game_properties_col, _, game_commentary_col = st.columns([0.25, 0.2, 0.55])
+        with game_properties_col:
+            # Name
+            st.markdown(
+                f"<h1 style='text-align: center; font-size: 44px'>{game['Name']}</h1>",
+                unsafe_allow_html=True,
+            )
+
+            # Image
+            img_bytes = base64.b64decode(game["CoverImg"])
+            img_stream = BytesIO(img_bytes)
+            st.image(img_stream, use_column_width=True)
+
+            # Properties
+            st.link_button("🛒 View on store", url=game["URL"])
+            st.markdown(f'**Priority**: {self._get_priority(game["Priority"])}')
+            st.markdown(f'**Status**: {self._get_status(game["Status"])}')
+            st.markdown(f'**Stars**: {self._get_stars(game["Stars"])}')
+            st.write(f'**Purchased/Gamepass?** {"✅" if game["PurchasedOrGamePass"] else "❌"}')
+
+            # Dates
+            release_date = self._get_date(game["ReleaseDate"])
+            st.markdown(f"**Release date**: {release_date}" if release_date is not None else "**No release date.**")
+            started_date = self._get_date(game["FinishedDroppedDate"])
+            st.markdown(f"**Started date**: {started_date}" if started_date is not None else "**No started date.**")
+            dropped_date = self._get_date(game["FinishedDroppedDate"])
+            st.markdown(f"**Dropped/Finished date**: {dropped_date}" if dropped_date is not None else "**No dropped/finished date.**")
+
+            # Developers
+            base_pub_dev_html = """
+                <a href="https://store.steampowered.com/search/?term={}/" target="_blank" style="text-decoration: none; color: white;">
+                    <span>{}</span>
+                </a>
+            """
+            game["Developers"] = [base_pub_dev_html.format(developer.replace(" ", "%20"), developer) for developer in game["Developers"]]
+            tagger_component(
+                "<strong>Developers:</strong>",
+                game["Developers"],
+                self._get_tag_colors(len(game["Developers"]))
+            )
+            # Publishers
+            game["Publishers"] = [base_pub_dev_html.format(publisher.replace(" ", "%20"), publisher) for publisher in game["Publishers"]]
+            tagger_component(
+                "<strong>Publishers:</strong>",
+                game["Publishers"],
+                self._get_tag_colors(len(game["Publishers"]))
+            )
+            # Tags
+            base_tag_html = """
+                <a href="https://store.steampowered.com/tags/en/{}/" target="_blank" style="text-decoration: none; color: white;">
+                    <span>{}</span>
+                </a>
+            """
+            game["Tags"] = [base_tag_html.format(tag.replace(" ", "%20"), tag) for tag in game["Tags"]]
+            tagger_component(
+                "<strong>Tags</strong>: ",
+                game["Tags"],
+                self._get_tag_colors(len(game["Tags"]))
+            )
+
+        with game_commentary_col:
+            st.markdown(game["Commentary"])
+
     def _get_purchased_gamepass(self, purchased_or_gamepass: bool):
         if purchased_or_gamepass:
             purchased_or_gamepass = "✅ Purchased/In Gamepass"
@@ -288,6 +364,29 @@ class GamesTrackerPage:
             correct_status = game_status_options[status]
 
         return correct_status
+
+    def _get_tag_colors(self, number: int):
+        color_palette = [
+            "lightblue",
+            "orange",
+            "bluegreen",
+            "blue",
+            "violet",
+            "red",
+            "green",
+            "yellow",
+        ]
+        random.shuffle(color_palette)
+
+        num_repeats = number // len(color_palette)
+
+        # Create the color list by repeating the colors
+        color_list = color_palette * num_repeats
+
+        # Append any remaining colors to match the size
+        color_list += color_palette[:number % len(color_palette)]
+
+        return color_list
 
     def show_games(self, cols_list: list, games: dict, show_games_func):
         """Show games in expanders in the cols_list columns.
