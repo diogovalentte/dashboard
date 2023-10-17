@@ -52,7 +52,7 @@ func GetAllMedias(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 SELECT
   url, name, media_type, cover_img, release_date, genres, staff,
-  priority, status, stars, started_date, finished_dropped_date, ""
+  priority, status, stars, started_date, finished_dropped_date, commentary
 FROM
   medias_tracker;`,
 	)
