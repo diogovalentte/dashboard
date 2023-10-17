@@ -1,4 +1,3 @@
-import datetime
 import logging
 import time
 from urllib.parse import urljoin
@@ -177,6 +176,26 @@ class TrackersAPIClient:
                 res.status_code,
                 res.text,
             )
+
+    def get_media(
+        self, name: str
+    ):
+        path = "/v1/trackers/medias_tracker/get_media"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json={"name": name})
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                f"error while getting the media '{name}' from the medias tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
+        game = res.json().get("media")
+
+        return game
 
     def add_game(self, game_properties: dict) -> None:
         path = "/v1/trackers/games_tracker/add_game"

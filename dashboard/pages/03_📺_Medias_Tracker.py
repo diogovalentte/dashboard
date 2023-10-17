@@ -1,9 +1,11 @@
 import base64
+import random
 from io import BytesIO
 from datetime import date, datetime
 
 import streamlit as st
 from streamlit_calendar import calendar
+from streamlit_extras.tags import tagger_component
 
 from dashboard.api.client import get_api_client
 
@@ -46,25 +48,26 @@ class MediasTrackerPage:
         }
 
     def sidebar(self):
-        # Show a media highlighted in the sidebar
-        with st.sidebar.container():
-            if (highlight_media := st.session_state.get("media_to_be_highlighted", None)) is not None:
-                with st.expander(highlight_media["Name"], True):
-                    self._show_to_be_released_media(highlight_media, {}, False)
         with st.sidebar.expander("Add a media"):
             self.add_media()
         with st.sidebar.expander("Watching/Reading medias"):
             self.show_watching_reading_medias_tab()
-        self.api_client.show_all_jobs_updating()
+        # self.api_client.show_all_jobs_updating()
 
     def show(self):
         st.markdown(
             "<h1 style='text-align: center; font-size: 75px'>Medias Tracker</h1>",
             unsafe_allow_html=True,
         )
-        to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_media_tab = st.tabs(
-            ["To be released", "Not started", "Finished", "Dropped", "Update media"]
-        )
+
+        if (media_name_to_be_highlighted := st.session_state.get("media_name_to_be_highlighted", None)) is not None:
+            to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_media_tab, highlight_media_tab = st.tabs(
+                ["To be released", "Not started", "Finished", "Dropped", "Update media", media_name_to_be_highlighted]
+            )
+        else:
+            to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_media_tab = st.tabs(
+                ["To be released", "Not started", "Finished", "Dropped", "Update media"]
+            )
 
         with to_be_released_tab:
             self.show_to_be_released_tab()
@@ -76,6 +79,9 @@ class MediasTrackerPage:
             self.show_dropped_tab()
         with update_media_tab:
             self.show_update_media_tab()
+        if media_name_to_be_highlighted is not None:
+            with highlight_media_tab:
+                self.show_highlighted_media_tab()
 
         self.sidebar()
 
@@ -160,6 +166,11 @@ class MediasTrackerPage:
 
     def show_update_media_tab(self):
         self._show_update_media()
+
+    def show_highlighted_media_tab(self):
+        highlighted_media_name = st.session_state["media_name_to_be_highlighted"]
+        media = self.api_client.get_media(highlighted_media_name)
+        self._show_highlighted_media(media)
 
     def _show_watching_reading_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
         st.subheader(media["Name"])
@@ -258,6 +269,63 @@ class MediasTrackerPage:
                 st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
 
+    def _show_highlighted_media(self, media: dict):
+        media_properties_col, media_name_col, media_commentary_col = st.columns([0.25, 0.2, 0.55])
+        with media_properties_col:
+            # Name
+            st.markdown(
+                f"<h1 style='text-align: center; font-size: 44px'>{media['Name']}</h1>",
+                unsafe_allow_html=True,
+            )
+
+            # Image
+            img_bytes = base64.b64decode(media["CoverImg"])
+            img_stream = BytesIO(img_bytes)
+            st.image(img_stream, width=250)
+
+            # Properties
+            st.link_button("📺 View on site", url=media["URL"])
+            st.markdown(f'**Type**: {self._get_media_type(media["MediaType"])}')
+            st.markdown(f'**Priority**: {self._get_priority(media["Priority"])}')
+            st.markdown(f'**Status**: {self._get_status(media["Status"])}')
+            st.markdown(f'**Stars**: {self._get_stars(media["Stars"])}')
+
+            # Dates
+            release_date = self._get_date(media["ReleaseDate"])
+            st.markdown(f"**Release date**: {release_date}" if release_date is not None else "**No release date.**")
+            started_date = self._get_date(media["FinishedDroppedDate"])
+            st.markdown(f"**Started date**: {started_date}" if started_date is not None else "**No started date.**")
+            dropped_date = self._get_date(media["FinishedDroppedDate"])
+            st.markdown(f"**Dropped/Finished date**: {dropped_date}" if dropped_date is not None else "**No dropped/finished date.**")
+
+            # Genres
+            base_genres_html = """
+                <a href="https://www.imdb.com/search/title/?genres={}" target="_blank" style="text-decoration: none; color: white;">
+                    <span>{}</span>
+                </a>
+            """
+            media["Genres"] = [base_genres_html.format(genre.replace(" ", "%20"), genre) for genre in media["Genres"]]
+            tagger_component(
+                "<strong>Genres:</strong>",
+                media["Genres"],
+                self._get_tag_colors(len(media["Genres"]))
+            )
+            # Staff
+            base_staff_html = """
+                <a href="https://www.imdb.com/find/?q={}" target="_blank" style="text-decoration: none; color: white;">
+                    <span>{}</span>
+                </a>
+            """
+            media["Staff"] = [base_staff_html.format(staff.replace(" ", "%20"), staff) for staff in media["Staff"]]
+            tagger_component(
+                "<strong>Staff:</strong>",
+                media["Staff"],
+                self._get_tag_colors(len(media["Staff"]))
+            )
+
+        with media_commentary_col:
+            st.markdown(media["Commentary"])
+
     def _get_date(self, date_str: str):
         if date_str == "0001-01-01T00:00:00Z":
             return None
@@ -295,6 +363,29 @@ class MediasTrackerPage:
             correct_stars = media_stars_options[stars]
 
         return correct_stars
+
+    def _get_tag_colors(self, number: int):
+        color_palette = [
+            "lightblue",
+            "orange",
+            "bluegreen",
+            "blue",
+            "violet",
+            "red",
+            "green",
+            "yellow",
+        ]
+        random.shuffle(color_palette)
+
+        num_repeats = number // len(color_palette)
+
+        # Create the color list by repeating the colors
+        color_list = color_palette * num_repeats
+
+        # Append any remaining colors to match the size
+        color_list += color_palette[:number % len(color_palette)]
+
+        return color_list
 
     def show_medias(self, cols_list: list, medias: dict, show_media_func):
         """Show medias in expanders in the cols_list columns.
