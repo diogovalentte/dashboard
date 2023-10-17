@@ -24,6 +24,7 @@ func UpdateGame(c *gin.Context) {
 	jobsList, ok := c.MustGet("JobsList").(*job.Jobs)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "couldn't create the task's job"})
+		return
 	}
 	jobsList.AddJob(&currentJob)
 
