@@ -17,7 +17,6 @@ func DeleteGame(c *gin.Context) {
 		Task:      "Delete game from Games Tracker database",
 		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
 	}
-	currentJob.SetStartingState("Processing game request")
 
 	jobsList, ok := c.MustGet("JobsList").(*job.Jobs)
 	if !ok {
@@ -25,11 +24,13 @@ func DeleteGame(c *gin.Context) {
 		return
 	}
 	jobsList.AddJob(&currentJob)
+	currentJob.SetStartingState("Processing game request")
 
 	// Validate request
 	var gameRequest DeleteGameRequest
 	if err := c.ShouldBindJSON(&gameRequest); err != nil {
 		err = fmt.Errorf("invalid JSON fields, refer to the API documentation")
+		currentJob.SetFailedState(err)
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}

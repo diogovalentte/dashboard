@@ -17,7 +17,6 @@ func DeleteMedia(c *gin.Context) {
 		Task:      "Delete media from Medias Tracker database",
 		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
 	}
-	currentJob.SetStartingState("Processing media request")
 
 	jobsList, ok := c.MustGet("JobsList").(*job.Jobs)
 	if !ok {
@@ -25,11 +24,13 @@ func DeleteMedia(c *gin.Context) {
 		return
 	}
 	jobsList.AddJob(&currentJob)
+	currentJob.SetStartingState("Processing media request")
 
 	// Validate request
 	var mediaRequest DeleteMediaRequest
 	if err := c.ShouldBindJSON(&mediaRequest); err != nil {
 		err = fmt.Errorf("invalid JSON fields, refer to the API documentation")
+		currentJob.SetFailedState(err)
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
