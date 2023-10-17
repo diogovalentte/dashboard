@@ -6,6 +6,7 @@ from datetime import date, datetime
 import streamlit as st
 from streamlit_calendar import calendar
 from streamlit_extras.tags import tagger_component
+from streamlit_extras.stylable_container import stylable_container
 
 from dashboard.api.client import get_api_client
 
@@ -323,6 +324,23 @@ class GamesTrackerPage:
                 game["Tags"],
                 self._get_tag_colors(len(game["Tags"]))
             )
+            st.divider()
+
+            with stylable_container(
+                    key=f"highlight_game_delete_button",
+                    css_styles="""
+                    button {
+                        background-color: red;
+                        color: white;
+                    }
+                """
+            ):
+                if st.button(
+                    "Delete game",
+                    use_container_width=True
+                ):
+                    self.api_client.delete_game(game["Name"])
+                    st.success("Game delete requested")
 
         with game_commentary_col:
             st.markdown(game["Commentary"])

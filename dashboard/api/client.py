@@ -197,6 +197,21 @@ class TrackersAPIClient:
 
         return game
 
+    def delete_media(self, name: str) -> None:
+        path = "/v1/trackers/medias_tracker/delete_media"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json={"name": name})
+
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while deleting media on the medias tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
     def add_game(self, game_properties: dict) -> None:
         path = "/v1/trackers/games_tracker/add_game"
         url = urljoin(self.base_url, path)
@@ -246,6 +261,21 @@ class TrackersAPIClient:
         game = res.json().get("game")
 
         return game
+
+    def delete_game(self, name: str) -> None:
+        path = "/v1/trackers/games_tracker/delete_game"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json={"name": name})
+
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while deleting game on the games tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
 
     def get_all_games(
         self

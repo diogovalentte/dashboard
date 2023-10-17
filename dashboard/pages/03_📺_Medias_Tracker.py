@@ -6,6 +6,7 @@ from datetime import date, datetime
 import streamlit as st
 from streamlit_calendar import calendar
 from streamlit_extras.tags import tagger_component
+from streamlit_extras.stylable_container import stylable_container
 
 from dashboard.api.client import get_api_client
 
@@ -52,7 +53,7 @@ class MediasTrackerPage:
             self.add_media()
         with st.sidebar.expander("Watching/Reading medias"):
             self.show_watching_reading_medias_tab()
-        # self.api_client.show_all_jobs_updating()
+        self.api_client.show_all_jobs_updating()
 
     def show(self):
         st.markdown(
@@ -322,6 +323,23 @@ class MediasTrackerPage:
                 media["Staff"],
                 self._get_tag_colors(len(media["Staff"]))
             )
+            st.divider()
+
+            with stylable_container(
+                    key=f"highlight_media_delete_button",
+                    css_styles="""
+                    button {
+                        background-color: red;
+                        color: white;
+                    }
+                """
+            ):
+                if st.button(
+                        "Delete media",
+                        use_container_width=True
+                ):
+                    self.api_client.delete_media(media["Name"])
+                    st.success("Media delete requested")
 
         with media_commentary_col:
             st.markdown(media["Commentary"])
