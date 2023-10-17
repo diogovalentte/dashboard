@@ -30,6 +30,7 @@ func MediasTrackerRoutes(group *gin.RouterGroup) {
 	{
 		medias_tracker_group.POST("/add_media", AddMedia)
 		medias_tracker_group.POST("/update_media", UpdateMedia)
+		medias_tracker_group.POST("/delete_media", DeleteMedia)
 		medias_tracker_group.POST("/get_media", GetMedia)
 		medias_tracker_group.GET("/get_all_medias", GetAllMedias)
 		medias_tracker_group.GET("/get_watching_reading_medias", GetWatchingReadingMedias)
