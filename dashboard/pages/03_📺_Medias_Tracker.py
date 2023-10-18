@@ -150,7 +150,6 @@ class MediasTrackerPage:
                 media_name = event_click["event"]["title"]
                 if media_name != st.session_state.get("media_name_to_be_highlighted"):
                     st.session_state["media_name_to_be_highlighted"] = media_name
-                    st.session_state["media_to_be_highlighted"] = medias[media_name]
                     st.rerun()
 
     def show_not_started_tab(self):
@@ -190,7 +189,6 @@ class MediasTrackerPage:
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
-                st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
         st.divider()
 
@@ -213,7 +211,6 @@ class MediasTrackerPage:
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
-                st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
 
     def _show_not_started_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
@@ -229,7 +226,6 @@ class MediasTrackerPage:
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
-                st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
 
     def _show_finished_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
@@ -248,7 +244,6 @@ class MediasTrackerPage:
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
-                st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
 
     def _show_dropped_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
@@ -267,7 +262,6 @@ class MediasTrackerPage:
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
-                st.session_state["media_to_be_highlighted"] = medias[media_name]
                 st.rerun()
 
     def _show_highlighted_media(self, media: dict):
@@ -338,8 +332,10 @@ class MediasTrackerPage:
                         "Delete media",
                         use_container_width=True
                 ):
-                    self.api_client.delete_media(media["Name"])
                     st.success("Media delete requested")
+                    self.api_client.delete_media(media["Name"])
+                    st.session_state["media_name_to_be_highlighted"] = None
+                    st.rerun()
 
         with media_commentary_col:
             st.markdown(media["Commentary"])
@@ -358,6 +354,14 @@ class MediasTrackerPage:
 
         return correct_priority
 
+    def _get_stars(self, stars: int | str):
+        correct_stars = self._media_stars_options.get(stars, None)
+        if correct_stars is None:
+            media_stars_options = {value: key for key, value in self._media_stars_options.items()}
+            correct_stars = media_stars_options[stars]
+
+        return correct_stars
+
     def _get_status(self, status: int | str):
         correct_status = self._media_status_options.get(status, None)
         if correct_status is None:
@@ -374,13 +378,6 @@ class MediasTrackerPage:
 
         return correct_media_type
 
-    def _get_stars(self, stars: int | str):
-        correct_stars = self._media_stars_options.get(stars, None)
-        if correct_stars is None:
-            media_stars_options = {value: key for key, value in self._media_stars_options.items()}
-            correct_stars = media_stars_options[stars]
-
-        return correct_stars
 
     def _get_tag_colors(self, number: int):
         color_palette = [

@@ -280,8 +280,6 @@ class TrackersAPIClient:
     def get_all_games(
         self
     ):
-        if not st.session_state.get("update_all_games", None) in (True, None):
-            return st.session_state.get("all_games")
         path = "/v1/trackers/games_tracker/get_all_games"
         url = urljoin(self.base_url, path)
 
@@ -300,15 +298,11 @@ class TrackersAPIClient:
             games = {game["Name"]: game for game in games}
         else:
             games = dict()
-        st.session_state["all_games"] = games
-        st.session_state["update_all_games"] = False
 
-        return st.session_state.get("all_games")
+        return games
 
     def get_playing_games(self):
         """Return games that the user is currently playing"""
-        if not st.session_state.get("update_playing_games", None) in (True, None):
-            return st.session_state.get("playing_games")
         path = "/v1/trackers/games_tracker/get_playing_games"
         url = urljoin(self.base_url, path)
 
@@ -327,15 +321,11 @@ class TrackersAPIClient:
             games = {game["Name"]: game for game in games}
         else:
             games = dict()
-        st.session_state["playing_games"] = games
-        st.session_state["update_playing_games"] = False
 
-        return st.session_state.get("playing_games")
+        return games
 
     def get_to_be_released_games(self):
         """Return games that are to be released"""
-        if not st.session_state.get("update_to_be_released_games", None) in (True, None):
-            return st.session_state.get("to_be_released_games")
         path = "/v1/trackers/games_tracker/get_to_be_released_games"
         url = urljoin(self.base_url, path)
 
@@ -354,15 +344,11 @@ class TrackersAPIClient:
             games = {game["Name"]: game for game in games}
         else:
             games = dict()
-        st.session_state["to_be_released_games"] = games
-        st.session_state["update_to_be_released_games"] = False
 
-        return st.session_state.get("to_be_released_games")
+        return games
 
     def get_not_started_games(self):
         """Return games that were released but are not being played/not finished/dropped"""
-        if not st.session_state.get("update_not_started_games", None) in (True, None):
-            return st.session_state.get("not_started_games")
         path = "/v1/trackers/games_tracker/get_not_started_games"
         url = urljoin(self.base_url, path)
 
@@ -381,15 +367,11 @@ class TrackersAPIClient:
             games = {game["Name"]: game for game in games}
         else:
             games = dict()
-        st.session_state["not_started_games"] = games
-        st.session_state["update_not_started_games"] = False
 
-        return st.session_state.get("not_started_games")
+        return games
 
     def get_finished_games(self):
         """Return games that were marked as finished"""
-        if not st.session_state.get("update_finished_games", None) in (True, None):
-            return st.session_state.get("finished_games")
         path = "/v1/trackers/games_tracker/get_finished_games"
         url = urljoin(self.base_url, path)
 
@@ -408,15 +390,11 @@ class TrackersAPIClient:
             games = {game["Name"]: game for game in games}
         else:
             games = dict()
-        st.session_state["finished_games"] = games
-        st.session_state["update_finished_games"] = False
 
-        return st.session_state.get("finished_games")
+        return games
 
     def get_dropped_games(self):
         """Return games that were marked as dropped"""
-        if not st.session_state.get("update_dropped_games", None) in (True, None):
-            return st.session_state.get("dropped_games")
         path = "/v1/trackers/games_tracker/get_dropped_games"
         url = urljoin(self.base_url, path)
 
@@ -435,16 +413,12 @@ class TrackersAPIClient:
             games = {game["Name"]: game for game in games}
         else:
             games = dict()
-        st.session_state["dropped_games"] = games
-        st.session_state["update_dropped_games"] = False
 
-        return st.session_state.get("dropped_games")
+        return games
 
     def get_all_medias(
             self
     ):
-        if not st.session_state.get("update_all_medias", None) in (True, None):
-            return st.session_state.get("all_medias")
         path = "/v1/trackers/medias_tracker/get_all_medias"
         url = urljoin(self.base_url, path)
 
@@ -463,16 +437,12 @@ class TrackersAPIClient:
             medias = {media["Name"]: media for media in medias}
         else:
             medias = dict()
-        st.session_state["all_medias"] = medias
-        st.session_state["update_all_medias"] = False
 
-        return st.session_state.get("all_medias")
+        return medias
 
     def get_watching_reading_medias(
             self
     ):
-        if not st.session_state.get("update_watching_reading_medias", None) in (True, None):
-            return st.session_state.get("watching_reading_medias")
         path = "/v1/trackers/medias_tracker/get_watching_reading_medias"
         url = urljoin(self.base_url, path)
 
@@ -491,16 +461,12 @@ class TrackersAPIClient:
             medias = {media["Name"]: media for media in medias}
         else:
             medias = dict()
-        st.session_state["watching_reading_medias"] = medias
-        st.session_state["update_watching_reading_medias"] = False
 
-        return st.session_state.get("watching_reading_medias")
+        returnmedias
 
     def get_to_be_released_medias(
             self
     ):
-        if not st.session_state.get("update_to_be_released_medias", None) in (True, None):
-            return st.session_state.get("to_be_released_medias")
         path = "/v1/trackers/medias_tracker/get_to_be_released_medias"
         url = urljoin(self.base_url, path)
 
@@ -519,16 +485,12 @@ class TrackersAPIClient:
             medias = {media["Name"]: media for media in medias}
         else:
             medias = dict()
-        st.session_state["to_be_released_medias"] = medias
-        st.session_state["update_to_be_released_medias"] = False
 
-        return st.session_state.get("to_be_released_medias")
+        return medias
 
     def get_not_started_medias(
             self
     ):
-        if not st.session_state.get("update_not_started_medias", None) in (True, None):
-            return st.session_state.get("not_started_medias")
         path = "/v1/trackers/medias_tracker/get_not_started_medias"
         url = urljoin(self.base_url, path)
 
@@ -547,16 +509,12 @@ class TrackersAPIClient:
             medias = {media["Name"]: media for media in medias}
         else:
             medias = dict()
-        st.session_state["not_started_medias"] = medias
-        st.session_state["update_not_started_medias"] = False
 
-        return st.session_state.get("not_started_medias")
+        return medias
 
     def get_finished_medias(
             self
     ):
-        if not st.session_state.get("update_finished_medias", None) in (True, None):
-            return st.session_state.get("finished_medias")
         path = "/v1/trackers/medias_tracker/get_finished_medias"
         url = urljoin(self.base_url, path)
 
@@ -575,16 +533,12 @@ class TrackersAPIClient:
             medias = {media["Name"]: media for media in medias}
         else:
             medias = dict()
-        st.session_state["finished_medias"] = medias
-        st.session_state["update_finished_medias"] = False
 
-        return st.session_state.get("finished_medias")
+        return medias
 
     def get_dropped_medias(
             self
     ):
-        if not st.session_state.get("update_dropped_medias", None) in (True, None):
-            return st.session_state.get("dropped_medias")
         path = "/v1/trackers/medias_tracker/get_dropped_medias"
         url = urljoin(self.base_url, path)
 
@@ -603,10 +557,8 @@ class TrackersAPIClient:
             medias = {media["Name"]: media for media in medias}
         else:
             medias = dict()
-        st.session_state["dropped_medias"] = medias
-        st.session_state["update_dropped_medias"] = False
 
-        return st.session_state.get("dropped_medias")
+        return medias
 
 class APIClient(JobsAPIClient, TrackersAPIClient, SystemAPIClient):
     def __init__(self, base_URL: str, port: int) -> None:

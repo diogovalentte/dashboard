@@ -56,9 +56,9 @@ class GamesTrackerPage:
             unsafe_allow_html=True,
         )
 
-        if (highlight_game := st.session_state.get("game_to_be_highlighted", None)) is not None:
+        if (game_name_to_be_highlighted := st.session_state.get("game_name_to_be_highlighted", None)) is not None:
             to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_game_tab, highlight_game_tab = st.tabs(
-                ["To be released", "Not started", "Finished", "Dropped", "Update game", highlight_game["Name"]]
+                ["To be released", "Not started", "Finished", "Dropped", "Update game", game_name_to_be_highlighted]
             )
         else:
             to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_game_tab = st.tabs(
@@ -76,7 +76,7 @@ class GamesTrackerPage:
             self.show_dropped_tab()
         with update_game_tab:
             self.show_update_game_tab()
-        if highlight_game is not None:
+        if game_name_to_be_highlighted is not None:
             with highlight_game_tab:
                 self.show_highlighted_game_tab()
 
@@ -146,7 +146,6 @@ class GamesTrackerPage:
                 game_name = event_click["event"]["title"]
                 if game_name != st.session_state.get("game_name_to_be_highlighted"):
                     st.session_state["game_name_to_be_highlighted"] = game_name
-                    st.session_state["game_to_be_highlighted"] = games[game_name]
                     st.rerun()
 
     def show_not_started_tab(self):
@@ -188,7 +187,6 @@ class GamesTrackerPage:
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
-                st.session_state["game_to_be_highlighted"] = games[game_name]
                 st.rerun()
 
     def _show_playing_game(self, game: dict, games: dict, show_highlight_button: bool = True):
@@ -208,7 +206,6 @@ class GamesTrackerPage:
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
-                st.session_state["game_to_be_highlighted"] = games[game_name]
                 st.rerun()
         st.divider()
 
@@ -225,7 +222,6 @@ class GamesTrackerPage:
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
-                st.session_state["game_to_be_highlighted"] = games[game_name]
                 st.rerun()
 
     def _show_finished_game(self, game: dict, games: dict, show_highlight_button: bool = True):
@@ -243,7 +239,6 @@ class GamesTrackerPage:
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
-                st.session_state["game_to_be_highlighted"] = games[game_name]
                 st.rerun()
 
     def _show_dropped_game(self, game: dict, games: dict, show_highlight_button: bool = True):
@@ -261,7 +256,6 @@ class GamesTrackerPage:
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
-                st.session_state["game_to_be_highlighted"] = games[game_name]
                 st.rerun()
 
     def _show_highlighted_game(self, game: dict):
@@ -339,8 +333,10 @@ class GamesTrackerPage:
                     "Delete game",
                     use_container_width=True
                 ):
-                    self.api_client.delete_game(game["Name"])
                     st.success("Game delete requested")
+                    self.api_client.delete_game(game["Name"])
+                    st.session_state["game_name_to_be_highlighted"] = None
+                    st.rerun()
 
         with game_commentary_col:
             st.markdown(game["Commentary"])
@@ -508,7 +504,7 @@ class GamesTrackerPage:
                 self.api_client.add_game(game_properties)
 
                 st.success("Game requested")
-                st.session_state["update_all_games"] = True
+                st.rerun()
 
     def _show_update_game(self):
         games = self.api_client.get_all_games()
@@ -618,7 +614,7 @@ class GamesTrackerPage:
                         self.api_client.update_game(game_properties)
 
                         st.success("Game update requested")
-                        st.session_state["update_all_games"] = True
+                        st.rerun()
 
     def show_markdown_editor(self, original_body: str):
         markdown_viewer_col, markdown_editor_col = st.columns(2)
