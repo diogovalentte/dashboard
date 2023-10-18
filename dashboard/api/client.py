@@ -462,7 +462,7 @@ class TrackersAPIClient:
         else:
             medias = dict()
 
-        returnmedias
+        return medias
 
     def get_to_be_released_medias(
             self
