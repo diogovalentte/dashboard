@@ -233,7 +233,7 @@ ORDER BY
 	c.JSON(http.StatusOK, gin.H{"games": games})
 }
 
-func getGamesFromQuery(sqlQuery string) ([]*GameProperties, error) {
+func getGamesFromQuery(sqlQuery string) ([]*GetGameProperties, error) {
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs/")
 	if err != nil {
 		return nil, err
@@ -252,9 +252,9 @@ func getGamesFromQuery(sqlQuery string) ([]*GameProperties, error) {
 	}
 	defer rows.Close()
 
-	var gamesProperties []*GameProperties
+	var gamesProperties []*GetGameProperties
 	for rows.Next() {
-		gameProperties := GameProperties{}
+		gameProperties := GetGameProperties{}
 		var tagsStr string
 		var developersStr string
 		var publishersStr string
@@ -284,4 +284,21 @@ func getGamesFromQuery(sqlQuery string) ([]*GameProperties, error) {
 	}
 
 	return gamesProperties, nil
+}
+
+type GetGameProperties struct {
+	URL                 string
+	Name                string
+	CoverImg            []byte
+	ReleaseDate         time.Time
+	Tags                []string
+	Developers          []string
+	Publishers          []string
+	Priority            int
+	Status              int
+	Stars               int
+	PurchasedOrGamePass bool
+	StartedDate         time.Time
+	FinishedDroppedDate time.Time
+	Commentary          string
 }
