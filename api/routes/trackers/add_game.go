@@ -59,7 +59,7 @@ func AddGame(c *gin.Context) {
 		return
 	}
 
-	// Get game info from a web store and create the game trackers page
+	// Get game info from a web store and insert into DB
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
 		currentJob.SetFailedState(err)
@@ -67,17 +67,15 @@ func AddGame(c *gin.Context) {
 		return
 	}
 
-	// Get game info from a web store and create the game trackers page
 	if !gameRequest.Wait {
-		go addGameTask(&currentJob, &gameRequest, configs, c, gameRequest.Wait)
-		c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
+		go addGameTask(&currentJob, nil, configs, &gameRequest)
 	} else {
-		addGameTask(&currentJob, &gameRequest, configs, c, gameRequest.Wait)
+		addGameTask(&currentJob, c, configs, &gameRequest)
 	}
 }
 
 type AddGameRequest struct {
-	Wait                   bool      `json:"wait" binding:"-"` // Wether the requester wants to wait for the task to be done before responding
+	Wait                   bool      `json:"wait" binding:"-"` // Whether the requester wants to wait for the task to be done before responding
 	URL                    string    `json:"url" binding:"required,http_url"`
 	Priority               int       `json:"priority" binding:"required"`
 	Status                 int       `json:"status" binding:"required"`
@@ -112,68 +110,76 @@ func (gr *AddGameRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time) 
 
 func (gr *AddGameRequest) SetReleaseDate(releaseDate time.Time) {}
 
-func addGameTask(currentJob *job.Job, gameRequest *AddGameRequest, configs *util.Configs, c *gin.Context, wait bool) {
-	scrapedGameProperties, err := GetGameMetadata(gameRequest.URL, (*configs).Firefox.BinaryPath, currentJob)
+func addGameTask(currentJob *job.Job, context *gin.Context, configs *util.Configs, gameRequest *AddGameRequest) {
+	// Get webdriver
+	currentJob.SetExecutingStateWithValue("Waiting for a WebDriver", gameRequest.URL)
+	wd, geckodriver, err := scraping.GetWebDriver((*configs).Firefox.BinaryPath)
 	if err != nil {
 		currentJob.SetFailedState(err)
-		if wait {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		if context != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		}
+		return
+	}
+	defer wd.Close()
+	defer geckodriver.Release()
+
+	// Scrap game metadata
+	currentJob.SetExecutingState("Scraping game data")
+	scrapedGameProperties, err := GetGameMetadata(gameRequest.URL, &wd)
+	if err != nil {
+		currentJob.SetFailedState(err)
+		if context != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		}
 		return
 	}
 
-	currentJob.SetExecutingStateWithValue("Adding game to DB", scrapedGameProperties.Name)
-
+	// Create GameProperties
 	gameProperties, err := getGameProperties(gameRequest, scrapedGameProperties)
 	if err != nil {
 		currentJob.SetFailedState(err)
-		if wait {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		if context != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		}
 		return
 	}
-	err = insertGameToDB(gameProperties)
+
+	// Insert game into DB
+	currentJob.SetExecutingStateWithValue("Adding game to DB", scrapedGameProperties.Name)
+	err = insertGameIntoDB(gameProperties)
 	if err != nil {
 		currentJob.SetFailedState(err)
-		if wait {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		if context != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		}
 		return
 	}
 
-	currentJob.SetCompletedState("Game inserted into DB")
-
-	if wait {
-		c.JSON(http.StatusOK, gin.H{"message": "Game inserted into DB"})
+	completeMsg := "Game added to DB"
+	currentJob.SetCompletedStateWithValue(completeMsg, gameProperties.Name)
+	if context != nil {
+		context.JSON(http.StatusOK, gin.H{"message": completeMsg})
 	}
 }
 
-func GetGameMetadata(gameURL, firefoxPath string, job *job.Job) (*ScrapedGameProperties, error) {
-	// Gets game metadata from a web store (Steam)
+func GetGameMetadata(gameURL string, wd *selenium.WebDriver) (*ScrapedGameProperties, error) {
+	// Get game metadata from a web store (Steam)
 	gameURL = strings.SplitN(gameURL, "?", 2)[0]
 	steamPrefix := "https://store.steampowered.com/app/"
 	if isSteamURL := strings.HasPrefix(gameURL, steamPrefix); !isSteamURL {
 		return nil, fmt.Errorf("the game url %s is not a valid Steam url, it should start with: %s", gameURL, steamPrefix)
 	}
 
-	job.SetExecutingStateWithValue("Waiting for a WebDriver", gameURL)
-	wd, geckodriver, err := scraping.GetWebDriver(firefoxPath)
-	if err != nil {
-		return nil, err
-	}
-	defer wd.Close()
-	defer geckodriver.Release()
-	job.SetExecutingState("Scraping game data")
-
 	// Get the game properties
-	if err := wd.Get(gameURL); err != nil {
+	if err := (*wd).Get(gameURL); err != nil {
 		return nil, fmt.Errorf("could not get the page with URL: %s. Error: %s", gameURL, err)
 	}
 
 	timeout := 10 * time.Second
 	secondAttempt, thirdAttempt := false, false
 	for !thirdAttempt {
-		err = wd.WaitWithTimeout(gameNameCondition, timeout)
+		err := (*wd).WaitWithTimeout(gameNameCondition, timeout)
 		if err != nil {
 			timeoutErrorPrefix := "timeout after"
 			isTimeoutError := strings.HasPrefix(err.Error(), timeoutErrorPrefix)
@@ -181,13 +187,13 @@ func GetGameMetadata(gameURL, firefoxPath string, job *job.Job) (*ScrapedGamePro
 				// Maybe is an age consent page where we need to submit an age to get the game page
 				optionsXPATH := map[string]string{"//select[@id='ageDay']": "29", "//select[@id='ageMonth']": "August", "//select[@id='ageYear']": "1958"} // King's birthday
 				for xpath, option := range optionsXPATH {
-					err = selectFromDropdown(&wd, xpath, option)
+					err = selectFromDropdown(wd, xpath, option)
 					if err != nil {
 						return nil, err
 					}
 				}
 
-				viewPageElem, err := wd.FindElement(selenium.ByXPATH, "//a[@id='view_product_page_btn']")
+				viewPageElem, err := (*wd).FindElement(selenium.ByXPATH, "//a[@id='view_product_page_btn']")
 				if err != nil {
 					return nil, err
 				}
@@ -209,7 +215,7 @@ func GetGameMetadata(gameURL, firefoxPath string, job *job.Job) (*ScrapedGamePro
 	}
 
 	// Name
-	gameNameElem, err := wd.FindElement(selenium.ByXPATH, "//div[@id='appHubAppName']")
+	gameNameElem, err := (*wd).FindElement(selenium.ByXPATH, "//div[@id='appHubAppName']")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
@@ -219,7 +225,7 @@ func GetGameMetadata(gameURL, firefoxPath string, job *job.Job) (*ScrapedGamePro
 	}
 
 	// Cover URL
-	coverURLElem, err := wd.FindElement(selenium.ByXPATH, "//img[@class='game_header_image_full']")
+	coverURLElem, err := (*wd).FindElement(selenium.ByXPATH, "//img[@class='game_header_image_full']")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
@@ -230,7 +236,7 @@ func GetGameMetadata(gameURL, firefoxPath string, job *job.Job) (*ScrapedGamePro
 
 	// Release date
 	var releaseDate time.Time
-	releaseDateElem, err := wd.FindElement(selenium.ByXPATH, "//div[@class='release_date']/div[@class='date']")
+	releaseDateElem, err := (*wd).FindElement(selenium.ByXPATH, "//div[@class='release_date']/div[@class='date']")
 	if err != nil {
 		if err.Error() != "no such element: Unable to locate element: //div[@class='release_date']/div[@class='date']" {
 			return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
@@ -254,33 +260,33 @@ func GetGameMetadata(gameURL, firefoxPath string, job *job.Job) (*ScrapedGamePro
 
 	// Tags
 	var tags []string
-	tagsElems, err := wd.FindElements(selenium.ByXPATH, "//div[contains(@class, 'glance_tags popular_tags')]/a")
+	tagsElems, err := (*wd).FindElements(selenium.ByXPATH, "//div[contains(@class, 'glance_tags popular_tags')]/a")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
-	tags, err = getTextFromDisplayNoneElements(tagsElems, &wd)
+	tags, err = getTextFromDisplayNoneElements(tagsElems, wd)
 	if err != nil {
 		return nil, err
 	}
 
 	// Developers
 	var developers []string
-	developersElems, err := wd.FindElements(selenium.ByXPATH, "//div[@class='dev_row']/div[contains(@class, 'subtitle')][text()='Developer:']/../div[@class='summary column']/a")
+	developersElems, err := (*wd).FindElements(selenium.ByXPATH, "//div[@class='dev_row']/div[contains(@class, 'subtitle')][text()='Developer:']/../div[@class='summary column']/a")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
-	developers, err = getTextFromDisplayNoneElements(developersElems, &wd)
+	developers, err = getTextFromDisplayNoneElements(developersElems, wd)
 	if err != nil {
 		return nil, err
 	}
 
 	// Publishers
 	var publishers []string
-	publishersElems, err := wd.FindElements(selenium.ByXPATH, "//div[@class='dev_row']/div[contains(@class, 'subtitle')][text()='Publisher:']/../div[@class='summary column']/a")
+	publishersElems, err := (*wd).FindElements(selenium.ByXPATH, "//div[@class='dev_row']/div[contains(@class, 'subtitle')][text()='Publisher:']/../div[@class='summary column']/a")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
-	publishers, err = getTextFromDisplayNoneElements(publishersElems, &wd)
+	publishers, err = getTextFromDisplayNoneElements(publishersElems, wd)
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +409,7 @@ type GameProperties struct {
 	Commentary          string
 }
 
-func insertGameToDB(gp *GameProperties) error {
+func insertGameIntoDB(gp *GameProperties) error {
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
 		return err

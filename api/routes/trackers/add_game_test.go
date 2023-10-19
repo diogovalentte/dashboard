@@ -3,25 +3,19 @@ package trackers_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/diogovalentte/dashboard/api/job"
+	"github.com/diogovalentte/dashboard/api"
+	"github.com/diogovalentte/dashboard/api/routes/trackers"
+	"github.com/diogovalentte/dashboard/api/scraping"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/diogovalentte/dashboard/api"
-	"github.com/diogovalentte/dashboard/api/routes/trackers"
 	"github.com/diogovalentte/dashboard/api/util"
 )
 
 func TestGetGameMetadata(t *testing.T) {
-	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
 	expected := trackers.ScrapedGameProperties{
 		Name:        "Red Dead Redemption 2",
 		CoverURL:    "https://cdn.akamai.steamstatic.com/steam/apps/1174180/header.jpg?t=1695140956",
@@ -31,8 +25,22 @@ func TestGetGameMetadata(t *testing.T) {
 		Tags:        []string{"Open World", "Story Rich", "Western", "Adventure", "Action", "Multiplayer", "Realistic", "Singleplayer", "Shooter", "Atmospheric", "Horses", "Beautiful", "Third-Person Shooter", "Mature", "Great Soundtrack", "Third Person", "Sandbox", "Gore", "First-Person", "FPS"},
 	}
 
+	// Get game metadata
+	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	wd, geckodriver, err := scraping.GetWebDriver((*configs).Firefox.BinaryPath)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer wd.Close()
+	defer geckodriver.Release()
+
 	gameURL := "https://store.steampowered.com/app/1174180/Red_Dead_Redemption_2"
-	actual, err := trackers.GetGameMetadata(gameURL, configs.Firefox.BinaryPath, &job.Job{})
+	actual, err := trackers.GetGameMetadata(gameURL, &wd)
 	if err != nil {
 		t.Error(err)
 		return
@@ -86,6 +94,7 @@ func TestAddGameRoute(t *testing.T) {
 	router := api.SetupRouter()
 
 	for _, gameRequest := range addGameRouteTestTable {
+		// Make request
 		requestBody, err := json.Marshal(gameRequest)
 		if err != nil {
 			t.Error(err)
@@ -107,13 +116,15 @@ func TestAddGameRoute(t *testing.T) {
 			continue
 		}
 
+		// Validate
 		expectedMessage := "Game inserted into DB"
 		actualMessage, exists := resMap["message"]
+		if !exists {
+			t.Error(`Response body has no field "message"`)
+			continue
+		}
+
 		if http.StatusOK != w.Code {
-			if !exists {
-				t.Error(`Response body has no field "message"`)
-				continue
-			}
 			if actualMessage == "UNIQUE constraint failed: games_tracker.name" {
 				t.Log("Game already in database")
 				continue
