@@ -227,6 +227,21 @@ class TrackersAPIClient:
                 res.text,
             )
 
+    def add_game_manually(self, game_properties: dict) -> None:
+        path = "/v1/trackers/games_tracker/add_game_manually"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json=game_properties)
+
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while manually adding game to games tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
     def update_game(self, game_properties: dict) -> None:
         path = "/v1/trackers/games_tracker/update_game"
         url = urljoin(self.base_url, path)

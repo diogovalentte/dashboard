@@ -4,6 +4,7 @@ from io import BytesIO
 from datetime import date, datetime
 
 import streamlit as st
+from streamlit_tags import st_tags
 from streamlit_calendar import calendar
 from streamlit_extras.tags import tagger_component
 from streamlit_extras.stylable_container import stylable_container
@@ -48,7 +49,7 @@ class GamesTrackerPage:
             self.add_game()
         with st.sidebar.expander("Playing games"):
             self.show_playing_games_tab()
-        self.api_client.show_all_jobs_updating()
+        # self.api_client.show_all_jobs_updating()
 
     def show(self):
         st.markdown(
@@ -420,6 +421,12 @@ class GamesTrackerPage:
             col_index += 1
 
     def add_game(self):
+        manually = st.toggle(
+            label="Add game properties manually",
+            value=False,
+            key="add_game_to_games_tracker_database_manually_toggle"
+        )
+
         with st.form("add_game_to_games_tracker_database", clear_on_submit=True):
             game_url = st.text_input(
                 "Game URL",
@@ -479,8 +486,12 @@ class GamesTrackerPage:
                 max_chars=1000,
             )
 
-            submitted = st.form_submit_button()
+            # Add game properties manually
+            if manually:
+                st.divider()
+                manual_properties = self._show_add_game_properties_manually()
 
+            submitted = st.form_submit_button()
             if submitted:
                 game_priority = self._get_priority(selected_game_priority)
                 game_status = self._get_status(selected_game_status)
@@ -501,10 +512,68 @@ class GamesTrackerPage:
                     "commentary": game_commentary
                 }
 
-                self.api_client.add_game(game_properties)
+                # Add game properties manually
+                if manually:
+                    game_properties.update(manual_properties)
+                    self.api_client.add_game_manually(game_properties)
+                else:
+                    self.api_client.add_game(game_properties)
 
                 st.success("Game requested")
                 st.rerun()
+
+    def _show_add_game_properties_manually(self):
+        game_name = st.text_input(
+            label="Game name",
+            placeholder="Outer Wilds",
+            key="add_game_to_games_tracker_database_game_name"
+        )
+        cover_img_url = st.text_input(
+            label="Game cover URL",
+            placeholder="https://site.com/image.png",
+            key="add_game_to_games_tracker_database_game_cover_img_url"
+        )
+        release_date = st.date_input(
+            label="Game release date",
+            key="add_game_to_games_tracker_database_game_release_date"
+        )
+        no_game_release_date = st.checkbox(
+            "I don't know the release date",
+            value=True,
+            key="add_game_to_games_tracker_database_game_no_release_date",
+        )
+        with stylable_container(
+            key="add_game_to_games_tracker_database_game_tags_stylable_container",
+            css_styles="""
+                p {
+                    font-size: 14px;
+                }
+            """
+        ):
+            tags = st_tags(
+                label="Game tags",
+                key="add_game_to_games_tracker_database_game_tags",
+            )
+            developers = st_tags(
+                label="Game developers",
+                key="add_game_to_games_tracker_database_game_developers",
+            )
+            publishers = st_tags(
+                label="Game publishers",
+                key="add_game_to_games_tracker_database_game_publishers",
+            )
+
+        game_properties = {
+            "name": game_name,
+            "cover_img_url": cover_img_url,
+            "release_date": str(release_date) if not no_game_release_date else None,
+            "tags": tags,
+            "developers": developers,
+            "publishers": publishers
+        }
+
+        return game_properties
+
 
     def _show_update_game(self):
         games = self.api_client.get_all_games()
