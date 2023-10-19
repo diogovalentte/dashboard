@@ -4,6 +4,7 @@ from io import BytesIO
 from datetime import date, datetime
 
 import streamlit as st
+from streamlit_tags import st_tags
 from streamlit_calendar import calendar
 from streamlit_extras.tags import tagger_component
 from streamlit_extras.stylable_container import stylable_container
@@ -53,7 +54,7 @@ class MediasTrackerPage:
             self.add_media()
         with st.sidebar.expander("Watching/Reading medias"):
             self.show_watching_reading_medias_tab()
-        self.api_client.show_all_jobs_updating()
+        # self.api_client.show_all_jobs_updating()
 
     def show(self):
         st.markdown(
@@ -420,7 +421,12 @@ class MediasTrackerPage:
             col_index += 1
 
     def add_media(self):
-        st.header("Add a media")
+        manually = st.toggle(
+            label="Add media properties manually",
+            value=True,
+            key="add_media_to_medias_tracker_database_manually_toggle"
+        )
+
         with st.form("add_media_to_medias_tracker_database", clear_on_submit=True):
             media_url = st.text_input(
                 "Media URL",
@@ -480,8 +486,12 @@ class MediasTrackerPage:
                 max_chars=100,
             )
 
-            submitted = st.form_submit_button()
+            # Add media properties manually
+            if manually:
+                st.divider()
+                manual_properties = self._show_add_media_properties_manually()
 
+            submitted = st.form_submit_button()
             if submitted:
                 media_type = self._get_media_type(selected_media_type)
                 media_priority = self._get_priority(selected_media_priority)
@@ -503,10 +513,61 @@ class MediasTrackerPage:
                     "commentary": media_commentary
                 }
 
-                self.api_client.add_media(media_properties)
+                # Add media properties manually
+                if manually:
+                    media_properties.update(manual_properties)
+                    self.api_client.add_media_manually(media_properties)
+                else:
+                    self.api_client.add_media(media_properties)
 
                 st.success("Requested media page")
 
+    def _show_add_media_properties_manually(self):
+        media_name = st.text_input(
+            label="Media name",
+            placeholder="Adventure Time",
+            key="add_media_to_medias_tracker_database_media_name"
+        )
+        cover_img_url = st.text_input(
+            label="Media cover URL",
+            placeholder="https://site.com/image.png",
+            key="add_media_to_medias_tracker_database_media_cover_img_url"
+        )
+        release_date = st.date_input(
+            label="Media release date",
+            key="add_media_to_medias_tracker_database_media_release_date"
+        )
+        no_media_release_date = st.checkbox(
+            "I don't know the release date",
+            value=True,
+            key="add_media_to_medias_tracker_database_media_no_release_date",
+        )
+        with stylable_container(
+                key="add_media_to_medias_tracker_database_media_tags_stylable_container",
+                css_styles="""
+                    p {
+                        font-size: 14px;
+                    }
+                """
+        ):
+            genres = st_tags(
+                label="Media genres",
+                key="add_media_to_medias_tracker_database_media_genres",
+            )
+            staff = st_tags(
+                label="Media staff",
+                key="add_media_to_medias_tracker_database_media_staff",
+            )
+
+        media_properties = {
+            "name": media_name,
+            "cover_img_url": cover_img_url,
+            "release_date": str(release_date) if not no_media_release_date else None,
+            "genres": genres,
+            "staff": staff
+        }
+
+        return media_properties
 
     def _show_update_media(self):
         medias = self.api_client.get_all_medias()

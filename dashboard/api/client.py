@@ -162,6 +162,21 @@ class TrackersAPIClient:
                 res.text,
             )
 
+    def add_media_manually(self, media_properties: dict) -> None:
+        path = "/v1/trackers/medias_tracker/add_media_manually"
+        url = urljoin(self.base_url, path)
+
+        res = requests.post(url, json=media_properties)
+
+        if res.status_code not in self.acceptable_status_codes:
+            raise APIException(
+                "error while manually adding media to medias tracker database",
+                url,
+                "POST",
+                res.status_code,
+                res.text,
+            )
+
     def update_media(self, game_properties: dict) -> None:
         path = "/v1/trackers/medias_tracker/update_media"
         url = urljoin(self.base_url, path)
