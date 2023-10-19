@@ -463,7 +463,7 @@ class MediasTrackerPage:
     def add_media(self):
         manually = st.toggle(
             label="Add media properties manually",
-            value=True,
+            value=False,
             key="add_media_to_medias_tracker_database_manually_toggle",
         )
 
