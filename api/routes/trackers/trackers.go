@@ -13,6 +13,7 @@ func GamesTrackerRoutes(group *gin.RouterGroup) {
 	games_tracker_group := group.Group("/games_tracker")
 	{
 		games_tracker_group.POST("/add_game", AddGame)
+		games_tracker_group.POST("/add_game_manually", AddGameManually)
 		games_tracker_group.POST("/update_game", UpdateGame)
 		games_tracker_group.POST("/delete_game", DeleteGame)
 		games_tracker_group.POST("/get_game", GetGame)

@@ -390,23 +390,52 @@ func getGameProperties(gr *AddGameRequest, sgp *ScrapedGameProperties) (*GamePro
 }
 
 type GameProperties struct {
-	Name                string
-	URL                 string
-	CoverImg            []byte
-	ReleaseDate         time.Time
-	TagsStr             string
-	Tags                []string
-	DevelopersStr       string
-	Developers          []string
-	PublishersStr       string
-	Publishers          []string
-	Priority            int
-	Status              int
-	Stars               int
-	PurchasedOrGamePass bool
-	StartedDate         time.Time
-	FinishedDroppedDate time.Time
-	Commentary          string
+	Wait                   bool   `json:"wait" binding:"-"` // Whether the requester wants to wait for the task to be done before responding
+	URL                    string `json:"url" binding:"required"`
+	Priority               int    `json:"priority" binding:"required"`
+	Status                 int    `json:"status" binding:"required"`
+	Stars                  int    `json:"stars" binding:"omitempty,gte=0,lte=5"`
+	PurchasedOrGamePass    bool   `json:"purchased_or_gamepass" binding:"-"`
+	Name                   string `json:"name" binding:"required"`
+	CoverImgURL            string `json:"cover_img_url" binding:"required"`
+	CoverImg               []byte
+	Tags                   []string `json:"tags" binding:"-"`
+	TagsStr                string
+	Developers             []string `json:"developers" binding:"-"`
+	DevelopersStr          string
+	Publishers             []string `json:"publishers" binding:"-"`
+	PublishersStr          string
+	ReleaseDateStr         string    `json:"release_date" binding:"omitempty,IsValidDate"`
+	ReleaseDate            time.Time `binding:"-"`
+	StartedDateStr         string    `json:"started_date" binding:"omitempty,IsValidDate"`
+	StartedDate            time.Time `binding:"-"`
+	FinishedDroppedDateStr string    `json:"finished_dropped_date" binding:"omitempty,IsValidDate"`
+	FinishedDroppedDate    time.Time `binding:"-"`
+	Commentary             string    `json:"commentary" binding:"-"`
+}
+
+func (gr *GameProperties) GetStartedDateStr() string {
+	return gr.StartedDateStr
+}
+
+func (gr *GameProperties) GetFinishedDroppedDateStr() string {
+	return gr.FinishedDroppedDateStr
+}
+
+func (gr *GameProperties) GetReleaseDateStr() string {
+	return gr.ReleaseDateStr
+}
+
+func (gr *GameProperties) SetStartedDate(startedDate time.Time) {
+	gr.StartedDate = startedDate
+}
+
+func (gr *GameProperties) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
+	gr.FinishedDroppedDate = finishedDroppedDate
+}
+
+func (gr *GameProperties) SetReleaseDate(releaseDate time.Time) {
+	gr.ReleaseDate = releaseDate
 }
 
 func insertGameIntoDB(gp *GameProperties) error {
@@ -457,4 +486,81 @@ VALUES (
 	}
 
 	return nil
+}
+
+func AddGameManually(c *gin.Context) {
+	// Create job
+	currentJob := job.Job{
+		Task:      "Add game to Games Tracker database",
+		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
+	}
+
+	jobsList, ok := c.MustGet("JobsList").(*job.Jobs)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "couldn't create the task's job"})
+		return
+	}
+	jobsList.AddJob(&currentJob)
+	currentJob.SetStartingState("Processing game request")
+
+	// Validate request
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		err := v.RegisterValidation("IsValidDate", IsValidDate)
+		if err != nil {
+			currentJob.SetFailedState(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			return
+		}
+	}
+
+	var gameProperties GameProperties
+	if err := c.ShouldBindJSON(&gameProperties); err != nil {
+		err = fmt.Errorf("invalid JSON fields, refer to the API documentation: %s", err.Error())
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	err := SetStructDateFields(&gameProperties)
+	if err != nil {
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	// Convert properties
+	coverImg, err := util.GetImageFromURL(gameProperties.CoverImgURL)
+	if err != nil {
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	gameProperties.CoverImg = coverImg
+
+	gameProperties.TagsStr = strings.Join(gameProperties.Tags, ",")
+	gameProperties.DevelopersStr = strings.Join(gameProperties.Developers, ",")
+	gameProperties.PublishersStr = strings.Join(gameProperties.Publishers, ",")
+
+	// Insert game into DB
+	currentJob.SetExecutingStateWithValue("Adding game to DB", gameProperties.Name)
+	if !gameProperties.Wait {
+		go func(currentJob *job.Job, gameProperties *GameProperties) {
+			err := insertGameIntoDB(gameProperties)
+			if err != nil {
+				currentJob.SetFailedState(err)
+				return
+			}
+
+			currentJob.SetCompletedState("Game added to DB")
+		}(&currentJob, &gameProperties)
+	} else {
+		err = insertGameIntoDB(&gameProperties)
+		if err != nil {
+			currentJob.SetFailedState(err)
+			c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Game added to DB"})
+	}
 }
