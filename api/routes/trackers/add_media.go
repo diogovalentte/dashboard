@@ -292,21 +292,50 @@ func getMediaProperties(mr *AddMediaRequest, smp *ScrapedMediaProperties) (*Medi
 }
 
 type MediaProperties struct {
-	Name                string
-	URL                 string
-	MediaType           int
-	CoverImg            []byte
-	ReleaseDate         time.Time
-	GenresStr           string
-	Genres              []string
-	StaffStr            string
-	Staff               []string
-	Priority            int
-	Status              int
-	Stars               int
-	StartedDate         time.Time
-	FinishedDroppedDate time.Time
-	Commentary          string
+	Wait                   bool   `json:"wait" binding:"-"` // Whether the requester wants to wait for the task to be done before responding
+	URL                    string `json:"url" binding:"required"`
+	Priority               int    `json:"priority" binding:"required"`
+	Status                 int    `json:"status" binding:"required"`
+	Stars                  int    `json:"stars" binding:"omitempty,gte=0,lte=5"`
+	MediaType              int    `json:"media_type" binding:"required"`
+	Name                   string `json:"name" binding:"required"`
+	CoverImgURL            string `json:"cover_img_url" binding:"required"`
+	CoverImg               []byte
+	Genres                 []string `json:"genres" binding:"-"`
+	GenresStr              string
+	Staff                  []string `json:"staff" binding:"-"`
+	StaffStr               string
+	ReleaseDateStr         string    `json:"release_date" binding:"omitempty,IsValidDate"`
+	ReleaseDate            time.Time `binding:"-"`
+	StartedDateStr         string    `json:"started_date" binding:"omitempty,IsValidDate"`
+	StartedDate            time.Time `binding:"-"`
+	FinishedDroppedDateStr string    `json:"finished_dropped_date" binding:"omitempty,IsValidDate"`
+	FinishedDroppedDate    time.Time `binding:"-"`
+	Commentary             string
+}
+
+func (gr *MediaProperties) GetStartedDateStr() string {
+	return gr.StartedDateStr
+}
+
+func (gr *MediaProperties) GetFinishedDroppedDateStr() string {
+	return gr.FinishedDroppedDateStr
+}
+
+func (gr *MediaProperties) GetReleaseDateStr() string {
+	return gr.ReleaseDateStr
+}
+
+func (gr *MediaProperties) SetStartedDate(startedDate time.Time) {
+	gr.StartedDate = startedDate
+}
+
+func (gr *MediaProperties) SetFinishedDroppedDate(finishedDroppedDate time.Time) {
+	gr.FinishedDroppedDate = finishedDroppedDate
+}
+
+func (gr *MediaProperties) SetReleaseDate(releaseDate time.Time) {
+	gr.ReleaseDate = releaseDate
 }
 
 func insertMediaIntoDB(mp *MediaProperties) error {
@@ -356,4 +385,80 @@ VALUES (
 	}
 
 	return nil
+}
+
+func AddMediaManually(c *gin.Context) {
+	// Create job
+	currentJob := job.Job{
+		Task:      "Add media to Meidas Tracker database",
+		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
+	}
+
+	jobsList, ok := c.MustGet("JobsList").(*job.Jobs)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "couldn't create the task's job"})
+		return
+	}
+	jobsList.AddJob(&currentJob)
+	currentJob.SetStartingState("Processing media request")
+
+	// Validate request
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		err := v.RegisterValidation("IsValidDate", IsValidDate)
+		if err != nil {
+			currentJob.SetFailedState(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			return
+		}
+	}
+
+	var mediaProperties MediaProperties
+	if err := c.ShouldBindJSON(&mediaProperties); err != nil {
+		err = fmt.Errorf("invalid JSON fields, refer to the API documentation: %s", err.Error())
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	err := SetStructDateFields(&mediaProperties)
+	if err != nil {
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	// Convert properties
+	coverImg, err := util.GetImageFromURL(mediaProperties.CoverImgURL)
+	if err != nil {
+		currentJob.SetFailedState(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	mediaProperties.CoverImg = coverImg
+
+	mediaProperties.GenresStr = strings.Join(mediaProperties.Genres, ",")
+	mediaProperties.StaffStr = strings.Join(mediaProperties.Staff, ",")
+
+	// Insert media into DB
+	currentJob.SetExecutingStateWithValue("Adding media to DB", mediaProperties.Name)
+	if !mediaProperties.Wait {
+		go func(currentJob *job.Job, mediaProperties *MediaProperties) {
+			err := insertMediaIntoDB(mediaProperties)
+			if err != nil {
+				currentJob.SetFailedState(err)
+				return
+			}
+
+			currentJob.SetCompletedState("Media added to DB")
+		}(&currentJob, &mediaProperties)
+	} else {
+		err = insertMediaIntoDB(&mediaProperties)
+		if err != nil {
+			currentJob.SetFailedState(err)
+			c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Media added to DB"})
+	}
 }
