@@ -117,7 +117,7 @@ func TestAddGameRoute(t *testing.T) {
 		}
 
 		// Validate
-		expectedMessage := "Game inserted into DB"
+		expectedMessage := "Game added to DB"
 		actualMessage, exists := resMap["message"]
 		if !exists {
 			t.Error(`Response body has no field "message"`)
