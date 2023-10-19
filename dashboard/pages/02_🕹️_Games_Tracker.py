@@ -1,16 +1,15 @@
 import base64
 import random
-from io import BytesIO
 from datetime import date, datetime
+from io import BytesIO
 
 import streamlit as st
-from streamlit_tags import st_tags
 from streamlit_calendar import calendar
-from streamlit_extras.tags import tagger_component
 from streamlit_extras.stylable_container import stylable_container
+from streamlit_extras.tags import tagger_component
+from streamlit_tags import st_tags
 
 from dashboard.api.client import get_api_client
-
 
 st.set_page_config(
     page_title="Games Tracker",
@@ -22,11 +21,7 @@ st.set_page_config(
 class GamesTrackerPage:
     def __init__(self) -> None:
         self.api_client = get_api_client()
-        self._game_priority_options = {
-            1: "🤩 High",
-            2: "😆 Medium",
-            3: "🙂 Low"
-        }
+        self._game_priority_options = {1: "🤩 High", 2: "😆 Medium", 3: "🙂 Low"}
         self._game_status_options = {
             1: "📅 To be released",
             2: "🗂️ Not started",
@@ -49,7 +44,6 @@ class GamesTrackerPage:
             self.add_game()
         with st.sidebar.expander("Playing games"):
             self.show_playing_games_tab()
-        # self.api_client.show_all_jobs_updating()
 
     def show(self):
         st.markdown(
@@ -57,15 +51,38 @@ class GamesTrackerPage:
             unsafe_allow_html=True,
         )
 
-        if (game_name_to_be_highlighted := st.session_state.get("game_name_to_be_highlighted", None)) is not None:
-            to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_game_tab, highlight_game_tab = st.tabs(
-                ["To be released", "Not started", "Finished", "Dropped", "Update game", game_name_to_be_highlighted]
+        if (
+            game_name_to_be_highlighted := st.session_state.get(
+                "game_name_to_be_highlighted", None
+            )
+        ) is not None:
+            (
+                to_be_released_tab,
+                not_started_tab,
+                finished_tab,
+                dropped_tab,
+                update_game_tab,
+                highlight_game_tab,
+            ) = st.tabs(
+                [
+                    "To be released",
+                    "Not started",
+                    "Finished",
+                    "Dropped",
+                    "Update game",
+                    game_name_to_be_highlighted,
+                ]
             )
         else:
-            to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_game_tab = st.tabs(
+            (
+                to_be_released_tab,
+                not_started_tab,
+                finished_tab,
+                dropped_tab,
+                update_game_tab,
+            ) = st.tabs(
                 ["To be released", "Not started", "Finished", "Dropped", "Update game"]
             )
-
 
         with to_be_released_tab:
             self.show_to_be_released_tab()
@@ -100,10 +117,7 @@ class GamesTrackerPage:
         with calendar_col:
             calendar_events = list()
             for name, game in games.items():
-                calendar_events.append({
-                    "title": name,
-                    "start": game["ReleaseDate"]
-                })
+                calendar_events.append({"title": name, "start": game["ReleaseDate"]})
             calendar_options = {
                 "initialDate": date.today().strftime("%Y-%m-%d"),
                 "initialView": "dayGridMonth",
@@ -114,10 +128,7 @@ class GamesTrackerPage:
                     "center": "title",
                     "right": "resourceTimelineDay,resourceTimelineWeek,resourceTimelineMonth",
                 },
-                "titleFormat": {
-                    "year": "numeric",
-                    "month": "long"
-                }
+                "titleFormat": {"year": "numeric", "month": "long"},
             }
             custom_css = """
                 .fc-event-past {
@@ -140,7 +151,7 @@ class GamesTrackerPage:
                 events=calendar_events,
                 options=calendar_options,
                 custom_css=custom_css,
-                key="to_be_released_games_calendar"
+                key="to_be_released_games_calendar",
             )
             event_click = to_be_released_calendar.get("eventClick", None)
             if event_click is not None:
@@ -170,9 +181,7 @@ class GamesTrackerPage:
         self._show_highlighted_game(game)
 
     def _show_to_be_released_game(
-            self, game: dict,
-            games: dict,
-            show_highlight_button: bool = True
+        self, game: dict, games: dict, show_highlight_button: bool = True
     ):
         img_bytes = base64.b64decode(game["CoverImg"])
         img_stream = BytesIO(img_bytes)
@@ -183,14 +192,16 @@ class GamesTrackerPage:
         st.write(self._get_purchased_gamepass(game["PurchasedOrGamePass"]))
         game_name = game["Name"]
         if show_highlight_button and st.button(
-                "Highlight game",
-                key=f"_show_game_img_priority_release_date_purchased_gamepass_{game_name}"
+            "Highlight game",
+            key=f"_show_game_img_priority_release_date_purchased_gamepass_{game_name}",
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
                 st.rerun()
 
-    def _show_playing_game(self, game: dict, games: dict, show_highlight_button: bool = True):
+    def _show_playing_game(
+        self, game: dict, games: dict, show_highlight_button: bool = True
+    ):
         st.subheader(game["Name"])
         img_bytes = base64.b64decode(game["CoverImg"])
         img_stream = BytesIO(img_bytes)
@@ -202,15 +213,16 @@ class GamesTrackerPage:
         st.write(started_date)
         game_name = game["Name"]
         if show_highlight_button and st.button(
-                "Highlight game",
-                key=f"show_playing_game_{game_name}"
+            "Highlight game", key=f"show_playing_game_{game_name}"
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
                 st.rerun()
         st.divider()
 
-    def _show_not_started_game(self, game: dict, games: dict, show_highlight_button: bool = True):
+    def _show_not_started_game(
+        self, game: dict, games: dict, show_highlight_button: bool = True
+    ):
         img_bytes = base64.b64decode(game["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -218,14 +230,15 @@ class GamesTrackerPage:
         st.write(self._get_purchased_gamepass(game["PurchasedOrGamePass"]))
         game_name = game["Name"]
         if show_highlight_button and st.button(
-                "Highlight game",
-                key=f"show_not_started_game_{game_name}"
+            "Highlight game", key=f"show_not_started_game_{game_name}"
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
                 st.rerun()
 
-    def _show_finished_game(self, game: dict, games: dict, show_highlight_button: bool = True):
+    def _show_finished_game(
+        self, game: dict, games: dict, show_highlight_button: bool = True
+    ):
         img_bytes = base64.b64decode(game["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -235,14 +248,15 @@ class GamesTrackerPage:
         st.write(self._get_stars(game["Stars"]))
         game_name = game["Name"]
         if show_highlight_button and st.button(
-                "Highlight game",
-                key=f"show_finished_game_{game_name}"
+            "Highlight game", key=f"show_finished_game_{game_name}"
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
                 st.rerun()
 
-    def _show_dropped_game(self, game: dict, games: dict, show_highlight_button: bool = True):
+    def _show_dropped_game(
+        self, game: dict, games: dict, show_highlight_button: bool = True
+    ):
         img_bytes = base64.b64decode(game["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -252,8 +266,7 @@ class GamesTrackerPage:
         st.write(self._get_stars(game["Stars"]))
         game_name = game["Name"]
         if show_highlight_button and st.button(
-                "Highlight game",
-                key=f"show_dropped_game_{game_name}"
+            "Highlight game", key=f"show_dropped_game_{game_name}"
         ):
             if game_name != st.session_state.get("game_name_to_be_highlighted"):
                 st.session_state["game_name_to_be_highlighted"] = game_name
@@ -278,15 +291,29 @@ class GamesTrackerPage:
             st.markdown(f'**Priority**: {self._get_priority(game["Priority"])}')
             st.markdown(f'**Status**: {self._get_status(game["Status"])}')
             st.markdown(f'**Stars**: {self._get_stars(game["Stars"])}')
-            st.write(f'**Purchased/Gamepass?** {"✅" if game["PurchasedOrGamePass"] else "❌"}')
+            st.write(
+                f'**Purchased/Gamepass?** {"✅" if game["PurchasedOrGamePass"] else "❌"}'
+            )
 
             # Dates
             release_date = self._get_date(game["ReleaseDate"])
-            st.markdown(f"**Release date**: {release_date}" if release_date is not None else "**No release date.**")
+            st.markdown(
+                f"**Release date**: {release_date}"
+                if release_date is not None
+                else "**No release date.**"
+            )
             started_date = self._get_date(game["FinishedDroppedDate"])
-            st.markdown(f"**Started date**: {started_date}" if started_date is not None else "**No started date.**")
+            st.markdown(
+                f"**Started date**: {started_date}"
+                if started_date is not None
+                else "**No started date.**"
+            )
             dropped_date = self._get_date(game["FinishedDroppedDate"])
-            st.markdown(f"**Dropped/Finished date**: {dropped_date}" if dropped_date is not None else "**No dropped/finished date.**")
+            st.markdown(
+                f"**Dropped/Finished date**: {dropped_date}"
+                if dropped_date is not None
+                else "**No dropped/finished date.**"
+            )
 
             # Developers
             base_pub_dev_html = """
@@ -294,18 +321,24 @@ class GamesTrackerPage:
                     <span>{}</span>
                 </a>
             """
-            game["Developers"] = [base_pub_dev_html.format(developer.replace(" ", "%20"), developer) for developer in game["Developers"]]
+            game["Developers"] = [
+                base_pub_dev_html.format(developer.replace(" ", "%20"), developer)
+                for developer in game["Developers"]
+            ]
             tagger_component(
                 "<strong>Developers:</strong>",
                 game["Developers"],
-                self._get_tag_colors(len(game["Developers"]))
+                self._get_tag_colors(len(game["Developers"])),
             )
             # Publishers
-            game["Publishers"] = [base_pub_dev_html.format(publisher.replace(" ", "%20"), publisher) for publisher in game["Publishers"]]
+            game["Publishers"] = [
+                base_pub_dev_html.format(publisher.replace(" ", "%20"), publisher)
+                for publisher in game["Publishers"]
+            ]
             tagger_component(
                 "<strong>Publishers:</strong>",
                 game["Publishers"],
-                self._get_tag_colors(len(game["Publishers"]))
+                self._get_tag_colors(len(game["Publishers"])),
             )
             # Tags
             base_tag_html = """
@@ -313,27 +346,27 @@ class GamesTrackerPage:
                     <span>{}</span>
                 </a>
             """
-            game["Tags"] = [base_tag_html.format(tag.replace(" ", "%20"), tag) for tag in game["Tags"]]
+            game["Tags"] = [
+                base_tag_html.format(tag.replace(" ", "%20"), tag)
+                for tag in game["Tags"]
+            ]
             tagger_component(
                 "<strong>Tags</strong>: ",
                 game["Tags"],
-                self._get_tag_colors(len(game["Tags"]))
+                self._get_tag_colors(len(game["Tags"])),
             )
             st.divider()
 
             with stylable_container(
-                    key=f"highlight_game_delete_button",
-                    css_styles="""
+                key=f"highlight_game_delete_button",
+                css_styles="""
                     button {
                         background-color: red;
                         color: white;
                     }
-                """
+                """,
             ):
-                if st.button(
-                    "Delete game",
-                    use_container_width=True
-                ):
+                if st.button("Delete game", use_container_width=True):
                     st.success("Game delete requested")
                     self.api_client.delete_game(game["Name"])
                     st.session_state["game_name_to_be_highlighted"] = None
@@ -354,12 +387,16 @@ class GamesTrackerPage:
         if date_str == "0001-01-01T00:00:00Z":
             return None
         else:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%B %d, %Y")
+            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime(
+                "%B %d, %Y"
+            )
 
     def _get_priority(self, priority: int | str):
         correct_priority = self._game_priority_options.get(priority, None)
         if correct_priority is None:
-            game_priority_options = {value: key for key, value in self._game_priority_options.items()}
+            game_priority_options = {
+                value: key for key, value in self._game_priority_options.items()
+            }
             correct_priority = game_priority_options[priority]
 
         return correct_priority
@@ -367,7 +404,9 @@ class GamesTrackerPage:
     def _get_stars(self, stars: int | str):
         correct_stars = self._game_stars_options.get(stars, None)
         if correct_stars is None:
-            game_stars_options = {value: key for key, value in self._game_stars_options.items()}
+            game_stars_options = {
+                value: key for key, value in self._game_stars_options.items()
+            }
             correct_stars = game_stars_options[stars]
 
         return correct_stars
@@ -375,7 +414,9 @@ class GamesTrackerPage:
     def _get_status(self, status: int | str):
         correct_status = self._game_status_options.get(status, None)
         if correct_status is None:
-            game_status_options = {value: key for key, value in self._game_status_options.items()}
+            game_status_options = {
+                value: key for key, value in self._game_status_options.items()
+            }
             correct_status = game_status_options[status]
 
         return correct_status
@@ -399,7 +440,7 @@ class GamesTrackerPage:
         color_list = color_palette * num_repeats
 
         # Append any remaining colors to match the size
-        color_list += color_palette[:number % len(color_palette)]
+        color_list += color_palette[: number % len(color_palette)]
 
         return color_list
 
@@ -424,7 +465,7 @@ class GamesTrackerPage:
         manually = st.toggle(
             label="Add game properties manually",
             value=False,
-            key="add_game_to_games_tracker_database_manually_toggle"
+            key="add_game_to_games_tracker_database_manually_toggle",
         )
 
         with st.form("add_game_to_games_tracker_database", clear_on_submit=True):
@@ -507,9 +548,13 @@ class GamesTrackerPage:
                     "status": game_status,
                     "stars": game_stars,
                     "purchased_or_gamepass": purchased_or_gamepass,
-                    "started_date": str(game_started_date) if game_started_date is not None else "",
-                    "finished_dropped_date": str(game_finished_dropped_date) if game_finished_dropped_date is not None else "",
-                    "commentary": game_commentary
+                    "started_date": str(game_started_date)
+                    if game_started_date is not None
+                    else "",
+                    "finished_dropped_date": str(game_finished_dropped_date)
+                    if game_finished_dropped_date is not None
+                    else "",
+                    "commentary": game_commentary,
                 }
 
                 # Add game properties manually
@@ -526,16 +571,16 @@ class GamesTrackerPage:
         game_name = st.text_input(
             label="Game name",
             placeholder="Outer Wilds",
-            key="add_game_to_games_tracker_database_game_name"
+            key="add_game_to_games_tracker_database_game_name",
         )
         cover_img_url = st.text_input(
             label="Game cover URL",
             placeholder="https://site.com/image.png",
-            key="add_game_to_games_tracker_database_game_cover_img_url"
+            key="add_game_to_games_tracker_database_game_cover_img_url",
         )
         release_date = st.date_input(
             label="Game release date",
-            key="add_game_to_games_tracker_database_game_release_date"
+            key="add_game_to_games_tracker_database_game_release_date",
         )
         no_game_release_date = st.checkbox(
             "I don't know the release date",
@@ -548,7 +593,7 @@ class GamesTrackerPage:
                 p {
                     font-size: 14px;
                 }
-            """
+            """,
         ):
             tags = st_tags(
                 label="Game tags",
@@ -569,11 +614,10 @@ class GamesTrackerPage:
             "release_date": str(release_date) if not no_game_release_date else None,
             "tags": tags,
             "developers": developers,
-            "publishers": publishers
+            "publishers": publishers,
         }
 
         return game_properties
-
 
     def _show_update_game(self):
         games = self.api_client.get_all_games()
@@ -584,7 +628,7 @@ class GamesTrackerPage:
             options=games.keys(),
             index=None,
             placeholder="Choose a game",
-            key="update_game_on_games_tracker_database_select_game_to_update"
+            key="update_game_on_games_tracker_database_select_game_to_update",
         )
         st.title("")
         if selected_game is not None:
@@ -595,16 +639,22 @@ class GamesTrackerPage:
             game["Stars"] = self._get_stars(game["Stars"])
 
             release_date = datetime.strptime(game["ReleaseDate"], "%Y-%m-%dT%H:%M:%SZ")
-            game["ReleaseDate"] = date(release_date.year, release_date.month, release_date.day)
+            game["ReleaseDate"] = date(
+                release_date.year, release_date.month, release_date.day
+            )
 
             started_date = datetime.strptime(game["StartedDate"], "%Y-%m-%dT%H:%M:%SZ")
-            game["StartedDate"] = date(started_date.year, started_date.month, started_date.day)
+            game["StartedDate"] = date(
+                started_date.year, started_date.month, started_date.day
+            )
 
-            finished_dropped_date = datetime.strptime(game["FinishedDroppedDate"], "%Y-%m-%dT%H:%M:%SZ")
+            finished_dropped_date = datetime.strptime(
+                game["FinishedDroppedDate"], "%Y-%m-%dT%H:%M:%SZ"
+            )
             game["FinishedDroppedDate"] = date(
                 finished_dropped_date.year,
                 finished_dropped_date.month,
-                finished_dropped_date.day
+                finished_dropped_date.day,
             )
 
             # Show update form
@@ -616,34 +666,26 @@ class GamesTrackerPage:
                 with st.form("update_game_on_games_tracker_database"):
                     column_config = {
                         "Priority": st.column_config.SelectboxColumn(
-                            options=self._game_priority_options.values(),
-                            required=True
+                            options=self._game_priority_options.values(), required=True
                         ),
                         "Status": st.column_config.SelectboxColumn(
-                            options=self._game_status_options.values(),
-                            required=True
+                            options=self._game_status_options.values(), required=True
                         ),
                         "Stars": st.column_config.SelectboxColumn(
-                            options=self._game_stars_options.values(),
-                            required=True
+                            options=self._game_stars_options.values(), required=True
                         ),
                         "PurchasedOrGamePass": st.column_config.CheckboxColumn(
-                            label="Purchased/Gamepass?",
-                            required=True,
-                            width="small"
+                            label="Purchased/Gamepass?", required=True, width="small"
                         ),
                         "StartedDate": st.column_config.DateColumn(
-                            label="Started date",
-                            required=True
+                            label="Started date", required=True
                         ),
                         "FinishedDroppedDate": st.column_config.DateColumn(
-                            label="Finished/Dropped date",
-                            required=True
+                            label="Finished/Dropped date", required=True
                         ),
                         "ReleaseDate": st.column_config.DateColumn(
-                            label="Release date",
-                            required=True
-                        )
+                            label="Release date", required=True
+                        ),
                     }
                     column_order = (
                         "Priority",
@@ -652,7 +694,7 @@ class GamesTrackerPage:
                         "PurchasedOrGamePass",
                         "StartedDate",
                         "FinishedDroppedDate",
-                        "ReleaseDate"
+                        "ReleaseDate",
                     )
                     updated_game = st.data_editor(
                         [game],
@@ -673,11 +715,21 @@ class GamesTrackerPage:
                             "priority": game_priority,
                             "status": game_status,
                             "stars": game_stars,
-                            "purchased_or_gamepass": updated_game["PurchasedOrGamePass"],
-                            "started_date": str(updated_game["StartedDate"]) if updated_game["StartedDate"] is not None else "",
-                            "finished_dropped_date": str(updated_game["FinishedDroppedDate"]) if updated_game["FinishedDroppedDate"] is not None else "",
-                            "release_date": str(updated_game["ReleaseDate"]) if updated_game["ReleaseDate"] is not None else "",
-                            "commentary": edited_commentary
+                            "purchased_or_gamepass": updated_game[
+                                "PurchasedOrGamePass"
+                            ],
+                            "started_date": str(updated_game["StartedDate"])
+                            if updated_game["StartedDate"] is not None
+                            else "",
+                            "finished_dropped_date": str(
+                                updated_game["FinishedDroppedDate"]
+                            )
+                            if updated_game["FinishedDroppedDate"] is not None
+                            else "",
+                            "release_date": str(updated_game["ReleaseDate"])
+                            if updated_game["ReleaseDate"] is not None
+                            else "",
+                            "commentary": edited_commentary,
                         }
 
                         self.api_client.update_game(game_properties)
@@ -692,7 +744,7 @@ class GamesTrackerPage:
                 label="will be collapsed",
                 value=original_body,
                 label_visibility="collapsed",
-                key="update_game_on_games_tracker_database_markdown_editor"
+                key="update_game_on_games_tracker_database_markdown_editor",
             )
         with markdown_viewer_col:
             st.markdown(edited_body)

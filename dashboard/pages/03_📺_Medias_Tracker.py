@@ -1,13 +1,13 @@
 import base64
 import random
-from io import BytesIO
 from datetime import date, datetime
+from io import BytesIO
 
 import streamlit as st
-from streamlit_tags import st_tags
 from streamlit_calendar import calendar
-from streamlit_extras.tags import tagger_component
 from streamlit_extras.stylable_container import stylable_container
+from streamlit_extras.tags import tagger_component
+from streamlit_tags import st_tags
 
 from dashboard.api.client import get_api_client
 
@@ -21,14 +21,10 @@ st.set_page_config(
 class MediasTrackerPage:
     def __init__(self) -> None:
         self.api_client = get_api_client()
-        self._media_priority_options = {
-            1: "🤩 High",
-            2: "😆 Medium",
-            3: "🙂 Low"
-        }
+        self._media_priority_options = {1: "🤩 High", 2: "😆 Medium", 3: "🙂 Low"}
         self._media_status_options = {
-            1: "🗂️ Not started",
-            2: "📅 To be released",
+            1: "📅 To be released",
+            2: "🗂️ Not started",
             3: "🍿 Watching/Reading",
             4: "✅ Finished",
             5: "❌ Dropped",
@@ -54,7 +50,6 @@ class MediasTrackerPage:
             self.add_media()
         with st.sidebar.expander("Watching/Reading medias"):
             self.show_watching_reading_medias_tab()
-        # self.api_client.show_all_jobs_updating()
 
     def show(self):
         st.markdown(
@@ -62,12 +57,36 @@ class MediasTrackerPage:
             unsafe_allow_html=True,
         )
 
-        if (media_name_to_be_highlighted := st.session_state.get("media_name_to_be_highlighted", None)) is not None:
-            to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_media_tab, highlight_media_tab = st.tabs(
-                ["To be released", "Not started", "Finished", "Dropped", "Update media", media_name_to_be_highlighted]
+        if (
+            media_name_to_be_highlighted := st.session_state.get(
+                "media_name_to_be_highlighted", None
+            )
+        ) is not None:
+            (
+                to_be_released_tab,
+                not_started_tab,
+                finished_tab,
+                dropped_tab,
+                update_media_tab,
+                highlight_media_tab,
+            ) = st.tabs(
+                [
+                    "To be released",
+                    "Not started",
+                    "Finished",
+                    "Dropped",
+                    "Update media",
+                    media_name_to_be_highlighted,
+                ]
             )
         else:
-            to_be_released_tab, not_started_tab, finished_tab, dropped_tab, update_media_tab = st.tabs(
+            (
+                to_be_released_tab,
+                not_started_tab,
+                finished_tab,
+                dropped_tab,
+                update_media_tab,
+            ) = st.tabs(
                 ["To be released", "Not started", "Finished", "Dropped", "Update media"]
             )
 
@@ -104,10 +123,7 @@ class MediasTrackerPage:
         with calendar_col:
             calendar_events = list()
             for name, media in medias.items():
-                calendar_events.append({
-                    "title": name,
-                    "start": media["ReleaseDate"]
-                })
+                calendar_events.append({"title": name, "start": media["ReleaseDate"]})
             calendar_options = {
                 "initialDate": date.today().strftime("%Y-%m-%d"),
                 "initialView": "dayGridMonth",
@@ -118,10 +134,7 @@ class MediasTrackerPage:
                     "center": "title",
                     "right": "resourceTimelineDay,resourceTimelineWeek,resourceTimelineMonth",
                 },
-                "titleFormat": {
-                    "year": "numeric",
-                    "month": "long"
-                }
+                "titleFormat": {"year": "numeric", "month": "long"},
             }
             custom_css = """
                 .fc-event-past {
@@ -144,7 +157,7 @@ class MediasTrackerPage:
                 events=calendar_events,
                 options=calendar_options,
                 custom_css=custom_css,
-                key="to_be_released_medias_calendar"
+                key="to_be_released_medias_calendar",
             )
             event_click = to_be_released_calendar.get("eventClick", None)
             if event_click is not None:
@@ -173,7 +186,9 @@ class MediasTrackerPage:
         media = self.api_client.get_media(highlighted_media_name)
         self._show_highlighted_media(media)
 
-    def _show_watching_reading_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
+    def _show_watching_reading_media(
+        self, media: dict, medias: dict, show_highlight_button: bool = True
+    ):
         st.subheader(media["Name"])
         img_bytes = base64.b64decode(media["CoverImg"])
         img_stream = BytesIO(img_bytes)
@@ -185,8 +200,7 @@ class MediasTrackerPage:
         st.write(started_date)
         media_name = media["Name"]
         if show_highlight_button and st.button(
-                "Highlight media",
-                key=f"show_watching_reading_media_{media_name}"
+            "Highlight media", key=f"show_watching_reading_media_{media_name}"
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
@@ -194,9 +208,7 @@ class MediasTrackerPage:
         st.divider()
 
     def _show_to_be_released_media(
-            self, media: dict,
-            medias: dict,
-            show_highlight_button: bool = True
+        self, media: dict, medias: dict, show_highlight_button: bool = True
     ):
         img_bytes = base64.b64decode(media["CoverImg"])
         img_stream = BytesIO(img_bytes)
@@ -207,14 +219,15 @@ class MediasTrackerPage:
         st.write(release_date if release_date is not None else "No release date")
         media_name = media["Name"]
         if show_highlight_button and st.button(
-                "Highlight media",
-                key=f"show_to_be_released_media_{media_name}"
+            "Highlight media", key=f"show_to_be_released_media_{media_name}"
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
                 st.rerun()
 
-    def _show_not_started_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
+    def _show_not_started_media(
+        self, media: dict, medias: dict, show_highlight_button: bool = True
+    ):
         img_bytes = base64.b64decode(media["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -222,14 +235,15 @@ class MediasTrackerPage:
         st.write(self._get_priority(media["Priority"]))
         media_name = media["Name"]
         if show_highlight_button and st.button(
-                "Highlight media",
-                key=f"show_not_started_media_{media_name}"
+            "Highlight media", key=f"show_not_started_media_{media_name}"
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
                 st.rerun()
 
-    def _show_finished_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
+    def _show_finished_media(
+        self, media: dict, medias: dict, show_highlight_button: bool = True
+    ):
         img_bytes = base64.b64decode(media["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -240,14 +254,15 @@ class MediasTrackerPage:
         st.write(self._get_stars(media["Stars"]))
         media_name = media["Name"]
         if show_highlight_button and st.button(
-                "Highlight media",
-                key=f"show_finished_media_{media_name}"
+            "Highlight media", key=f"show_finished_media_{media_name}"
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
                 st.rerun()
 
-    def _show_dropped_media(self, media: dict, medias: dict, show_highlight_button: bool = True):
+    def _show_dropped_media(
+        self, media: dict, medias: dict, show_highlight_button: bool = True
+    ):
         img_bytes = base64.b64decode(media["CoverImg"])
         img_stream = BytesIO(img_bytes)
         st.image(img_stream)
@@ -258,15 +273,16 @@ class MediasTrackerPage:
         st.write(self._get_stars(media["Stars"]))
         media_name = media["Name"]
         if show_highlight_button and st.button(
-                "Highlight media",
-                key=f"show_dropped_media_{media_name}"
+            "Highlight media", key=f"show_dropped_media_{media_name}"
         ):
             if media_name != st.session_state.get("media_name_to_be_highlighted"):
                 st.session_state["media_name_to_be_highlighted"] = media_name
                 st.rerun()
 
     def _show_highlighted_media(self, media: dict):
-        media_properties_col, media_name_col, media_commentary_col = st.columns([0.25, 0.2, 0.55])
+        media_properties_col, media_name_col, media_commentary_col = st.columns(
+            [0.25, 0.2, 0.55]
+        )
         with media_properties_col:
             # Name
             st.markdown(
@@ -288,11 +304,23 @@ class MediasTrackerPage:
 
             # Dates
             release_date = self._get_date(media["ReleaseDate"])
-            st.markdown(f"**Release date**: {release_date}" if release_date is not None else "**No release date.**")
+            st.markdown(
+                f"**Release date**: {release_date}"
+                if release_date is not None
+                else "**No release date.**"
+            )
             started_date = self._get_date(media["FinishedDroppedDate"])
-            st.markdown(f"**Started date**: {started_date}" if started_date is not None else "**No started date.**")
+            st.markdown(
+                f"**Started date**: {started_date}"
+                if started_date is not None
+                else "**No started date.**"
+            )
             dropped_date = self._get_date(media["FinishedDroppedDate"])
-            st.markdown(f"**Dropped/Finished date**: {dropped_date}" if dropped_date is not None else "**No dropped/finished date.**")
+            st.markdown(
+                f"**Dropped/Finished date**: {dropped_date}"
+                if dropped_date is not None
+                else "**No dropped/finished date.**"
+            )
 
             # Genres
             base_genres_html = """
@@ -300,11 +328,14 @@ class MediasTrackerPage:
                     <span>{}</span>
                 </a>
             """
-            media["Genres"] = [base_genres_html.format(genre.replace(" ", "%20"), genre) for genre in media["Genres"]]
+            media["Genres"] = [
+                base_genres_html.format(genre.replace(" ", "%20"), genre)
+                for genre in media["Genres"]
+            ]
             tagger_component(
                 "<strong>Genres:</strong>",
                 media["Genres"],
-                self._get_tag_colors(len(media["Genres"]))
+                self._get_tag_colors(len(media["Genres"])),
             )
             # Staff
             base_staff_html = """
@@ -312,27 +343,27 @@ class MediasTrackerPage:
                     <span>{}</span>
                 </a>
             """
-            media["Staff"] = [base_staff_html.format(staff.replace(" ", "%20"), staff) for staff in media["Staff"]]
+            media["Staff"] = [
+                base_staff_html.format(staff.replace(" ", "%20"), staff)
+                for staff in media["Staff"]
+            ]
             tagger_component(
                 "<strong>Staff:</strong>",
                 media["Staff"],
-                self._get_tag_colors(len(media["Staff"]))
+                self._get_tag_colors(len(media["Staff"])),
             )
             st.divider()
 
             with stylable_container(
-                    key=f"highlight_media_delete_button",
-                    css_styles="""
+                key=f"highlight_media_delete_button",
+                css_styles="""
                     button {
                         background-color: red;
                         color: white;
                     }
-                """
+                """,
             ):
-                if st.button(
-                        "Delete media",
-                        use_container_width=True
-                ):
+                if st.button("Delete media", use_container_width=True):
                     st.success("Media delete requested")
                     self.api_client.delete_media(media["Name"])
                     st.session_state["media_name_to_be_highlighted"] = None
@@ -345,12 +376,16 @@ class MediasTrackerPage:
         if date_str == "0001-01-01T00:00:00Z":
             return None
         else:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%B %d, %Y")
+            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime(
+                "%B %d, %Y"
+            )
 
     def _get_priority(self, priority: int | str):
         correct_priority = self._media_priority_options.get(priority, None)
         if correct_priority is None:
-            media_priority_options = {value: key for key, value in self._media_priority_options.items()}
+            media_priority_options = {
+                value: key for key, value in self._media_priority_options.items()
+            }
             correct_priority = media_priority_options[priority]
 
         return correct_priority
@@ -358,7 +393,9 @@ class MediasTrackerPage:
     def _get_stars(self, stars: int | str):
         correct_stars = self._media_stars_options.get(stars, None)
         if correct_stars is None:
-            media_stars_options = {value: key for key, value in self._media_stars_options.items()}
+            media_stars_options = {
+                value: key for key, value in self._media_stars_options.items()
+            }
             correct_stars = media_stars_options[stars]
 
         return correct_stars
@@ -366,7 +403,9 @@ class MediasTrackerPage:
     def _get_status(self, status: int | str):
         correct_status = self._media_status_options.get(status, None)
         if correct_status is None:
-            media_status_options = {value: key for key, value in self._media_status_options.items()}
+            media_status_options = {
+                value: key for key, value in self._media_status_options.items()
+            }
             correct_status = media_status_options[status]
 
         return correct_status
@@ -374,11 +413,12 @@ class MediasTrackerPage:
     def _get_media_type(self, media_type: int | str):
         correct_media_type = self._media_type_options.get(media_type, None)
         if correct_media_type is None:
-            media_type_options = {value: key for key, value in self._media_type_options.items()}
+            media_type_options = {
+                value: key for key, value in self._media_type_options.items()
+            }
             correct_media_type = media_type_options[media_type]
 
         return correct_media_type
-
 
     def _get_tag_colors(self, number: int):
         color_palette = [
@@ -399,7 +439,7 @@ class MediasTrackerPage:
         color_list = color_palette * num_repeats
 
         # Append any remaining colors to match the size
-        color_list += color_palette[:number % len(color_palette)]
+        color_list += color_palette[: number % len(color_palette)]
 
         return color_list
 
@@ -424,7 +464,7 @@ class MediasTrackerPage:
         manually = st.toggle(
             label="Add media properties manually",
             value=True,
-            key="add_media_to_medias_tracker_database_manually_toggle"
+            key="add_media_to_medias_tracker_database_manually_toggle",
         )
 
         with st.form("add_media_to_medias_tracker_database", clear_on_submit=True):
@@ -510,7 +550,7 @@ class MediasTrackerPage:
                     "stars": media_stars,
                     "started_date": media_started_date,
                     "finished_dropped_date": media_finished_dropped_date,
-                    "commentary": media_commentary
+                    "commentary": media_commentary,
                 }
 
                 # Add media properties manually
@@ -526,16 +566,16 @@ class MediasTrackerPage:
         media_name = st.text_input(
             label="Media name",
             placeholder="Adventure Time",
-            key="add_media_to_medias_tracker_database_media_name"
+            key="add_media_to_medias_tracker_database_media_name",
         )
         cover_img_url = st.text_input(
             label="Media cover URL",
             placeholder="https://site.com/image.png",
-            key="add_media_to_medias_tracker_database_media_cover_img_url"
+            key="add_media_to_medias_tracker_database_media_cover_img_url",
         )
         release_date = st.date_input(
             label="Media release date",
-            key="add_media_to_medias_tracker_database_media_release_date"
+            key="add_media_to_medias_tracker_database_media_release_date",
         )
         no_media_release_date = st.checkbox(
             "I don't know the release date",
@@ -543,12 +583,12 @@ class MediasTrackerPage:
             key="add_media_to_medias_tracker_database_media_no_release_date",
         )
         with stylable_container(
-                key="add_media_to_medias_tracker_database_media_tags_stylable_container",
-                css_styles="""
+            key="add_media_to_medias_tracker_database_media_tags_stylable_container",
+            css_styles="""
                     p {
                         font-size: 14px;
                     }
-                """
+                """,
         ):
             genres = st_tags(
                 label="Media genres",
@@ -564,7 +604,7 @@ class MediasTrackerPage:
             "cover_img_url": cover_img_url,
             "release_date": str(release_date) if not no_media_release_date else None,
             "genres": genres,
-            "staff": staff
+            "staff": staff,
         }
 
         return media_properties
@@ -578,7 +618,7 @@ class MediasTrackerPage:
             options=medias.keys(),
             index=None,
             placeholder="Choose a media",
-            key="update_media_on_medias_tracker_database_select_media_to_update"
+            key="update_media_on_medias_tracker_database_select_media_to_update",
         )
         st.title("")
         if selected_media is not None:
@@ -590,16 +630,22 @@ class MediasTrackerPage:
             media["Stars"] = self._get_stars(media["Stars"])
 
             release_date = datetime.strptime(media["ReleaseDate"], "%Y-%m-%dT%H:%M:%SZ")
-            media["ReleaseDate"] = date(release_date.year, release_date.month, release_date.day)
+            media["ReleaseDate"] = date(
+                release_date.year, release_date.month, release_date.day
+            )
 
             started_date = datetime.strptime(media["StartedDate"], "%Y-%m-%dT%H:%M:%SZ")
-            media["StartedDate"] = date(started_date.year, started_date.month, started_date.day)
+            media["StartedDate"] = date(
+                started_date.year, started_date.month, started_date.day
+            )
 
-            finished_dropped_date = datetime.strptime(media["FinishedDroppedDate"], "%Y-%m-%dT%H:%M:%SZ")
+            finished_dropped_date = datetime.strptime(
+                media["FinishedDroppedDate"], "%Y-%m-%dT%H:%M:%SZ"
+            )
             media["FinishedDroppedDate"] = date(
                 finished_dropped_date.year,
                 finished_dropped_date.month,
-                finished_dropped_date.day
+                finished_dropped_date.day,
             )
 
             # Show update form
@@ -611,33 +657,26 @@ class MediasTrackerPage:
                 with st.form("update_media_on_medias_tracker_database"):
                     column_config = {
                         "MediaType": st.column_config.SelectboxColumn(
-                            options=self._media_type_options.values(),
-                            required=True
+                            options=self._media_type_options.values(), required=True
                         ),
                         "Priority": st.column_config.SelectboxColumn(
-                            options=self._media_priority_options.values(),
-                            required=True
+                            options=self._media_priority_options.values(), required=True
                         ),
                         "Status": st.column_config.SelectboxColumn(
-                            options=self._media_status_options.values(),
-                            required=True
+                            options=self._media_status_options.values(), required=True
                         ),
                         "Stars": st.column_config.SelectboxColumn(
-                            options=self._media_stars_options.values(),
-                            required=True
+                            options=self._media_stars_options.values(), required=True
                         ),
                         "StartedDate": st.column_config.DateColumn(
-                            label="Started date",
-                            required=True
+                            label="Started date", required=True
                         ),
                         "FinishedDroppedDate": st.column_config.DateColumn(
-                            label="Finished/Dropped date",
-                            required=True
+                            label="Finished/Dropped date", required=True
                         ),
                         "ReleaseDate": st.column_config.DateColumn(
-                            label="Release date",
-                            required=True
-                        )
+                            label="Release date", required=True
+                        ),
                     }
                     column_order = (
                         "MediaType",
@@ -646,7 +685,7 @@ class MediasTrackerPage:
                         "Stars",
                         "StartedDate",
                         "FinishedDroppedDate",
-                        "ReleaseDate"
+                        "ReleaseDate",
                     )
                     updated_media = st.data_editor(
                         [media],
@@ -669,10 +708,18 @@ class MediasTrackerPage:
                             "priority": media_priority,
                             "status": media_status,
                             "stars": media_stars,
-                            "started_date": str(updated_media["StartedDate"]) if updated_media["StartedDate"] is not None else "",
-                            "finished_dropped_date": str(updated_media["FinishedDroppedDate"]) if updated_media["FinishedDroppedDate"] is not None else "",
-                            "release_date": str(updated_media["ReleaseDate"]) if updated_media["ReleaseDate"] is not None else "",
-                            "commentary": edited_commentary
+                            "started_date": str(updated_media["StartedDate"])
+                            if updated_media["StartedDate"] is not None
+                            else "",
+                            "finished_dropped_date": str(
+                                updated_media["FinishedDroppedDate"]
+                            )
+                            if updated_media["FinishedDroppedDate"] is not None
+                            else "",
+                            "release_date": str(updated_media["ReleaseDate"])
+                            if updated_media["ReleaseDate"] is not None
+                            else "",
+                            "commentary": edited_commentary,
                         }
 
                         self.api_client.update_media(media_properties)
@@ -687,7 +734,7 @@ class MediasTrackerPage:
                 label="will be collapsed",
                 value=original_body,
                 label_visibility="collapsed",
-                key="update_media_on_medias_tracker_database_markdown_editor"
+                key="update_media_on_medias_tracker_database_markdown_editor",
             )
         with markdown_viewer_col:
             st.markdown(edited_body)
