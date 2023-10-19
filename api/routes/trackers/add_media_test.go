@@ -121,7 +121,7 @@ func TestAddMediaRoute(t *testing.T) {
 
 		if http.StatusOK != w.Code {
 			if actualMessage == "UNIQUE constraint failed: medias_tracker.name" {
-				t.Log("Game already in database")
+				t.Log("Media already in database")
 				continue
 			} else {
 				t.Errorf("expected status code: %d, actual status code: %d", http.StatusOK, w.Code)
