@@ -57,7 +57,7 @@ func AddMedia(c *gin.Context) {
 		return
 	}
 
-	// Get media info from a media site and create the media trackers page
+	// Get media info from a medias site and insert into DB
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
 		currentJob.SetFailedState(err)
@@ -65,12 +65,10 @@ func AddMedia(c *gin.Context) {
 		return
 	}
 
-	// Get media info from a web site and create the media trackers page
 	if !mediaRequest.Wait {
-		go addMediaTask(&currentJob, &mediaRequest, configs, c, mediaRequest.Wait)
-		c.JSON(http.StatusOK, gin.H{"message": "Job created with success"})
+		go addMediaTask(&currentJob, nil, configs, &mediaRequest)
 	} else {
-		addMediaTask(&currentJob, &mediaRequest, configs, c, mediaRequest.Wait)
+		addMediaTask(&currentJob, c, configs, &mediaRequest)
 	}
 }
 
@@ -110,72 +108,80 @@ func (mr *AddMediaRequest) SetFinishedDroppedDate(finishedDroppedDate time.Time)
 
 func (mr *AddMediaRequest) SetReleaseDate(releaseDate time.Time) {}
 
-func addMediaTask(currentJob *job.Job, mediaRequest *AddMediaRequest, configs *util.Configs, c *gin.Context, wait bool) {
-	scrapedMediaProperties, err := GetMediaMetadata(mediaRequest.URL, (*configs).Firefox.BinaryPath, currentJob)
+func addMediaTask(currentJob *job.Job, context *gin.Context, configs *util.Configs, mediaRequest *AddMediaRequest) {
+	// Get webdriver
+	currentJob.SetExecutingStateWithValue("Waiting for a WebDriver", mediaRequest.URL)
+	wd, geckodriver, err := scraping.GetWebDriver((*configs).Firefox.BinaryPath)
 	if err != nil {
 		currentJob.SetFailedState(err)
-		if wait {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		if context != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		}
+		return
+	}
+	defer wd.Close()
+	defer geckodriver.Release()
+
+	// Scrap media metadata
+	currentJob.SetExecutingState("Scraping media data")
+	scrapedMediaProperties, err := GetMediaMetadata(mediaRequest.URL, &wd)
+	if err != nil {
+		currentJob.SetFailedState(err)
+		if context != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		}
 		return
 	}
 
-	currentJob.SetExecutingStateWithValue("Creating media page", scrapedMediaProperties.Name)
-
+	// Create MediaProperties
 	mediaProperties, err := getMediaProperties(mediaRequest, scrapedMediaProperties)
 	if err != nil {
 		currentJob.SetFailedState(err)
-		if wait {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		if context != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		}
 		return
 	}
-	err = insertMediaToDB(mediaProperties)
+
+	// Insert media into DB
+	currentJob.SetExecutingStateWithValue("Adding media to DB", scrapedMediaProperties.Name)
+	err = insertMediaIntoDB(mediaProperties)
 	if err != nil {
 		currentJob.SetFailedState(err)
-		if wait {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		if context != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		}
 		return
 	}
 
-	currentJob.SetCompletedState("Media inserted into DB")
-
-	if wait {
-		c.JSON(http.StatusOK, gin.H{"message": "Media inserted into DB"})
+	completeMsg := "Media added to DB"
+	currentJob.SetCompletedStateWithValue(completeMsg, mediaProperties.Name)
+	if context != nil {
+		context.JSON(http.StatusOK, gin.H{"message": completeMsg})
 	}
 }
 
-func GetMediaMetadata(mediaURL, firefoxPath string, job *job.Job) (*ScrapedMediaProperties, error) {
-	// Gets media metadata from a media site (IMDB)
+func GetMediaMetadata(mediaURL string, wd *selenium.WebDriver) (*ScrapedMediaProperties, error) {
+	// Get media metadata from a media site (IMDB)
 	mediaURL = strings.SplitN(mediaURL, "?", 2)[0]
 	IMDBPrefix := "https://www.imdb.com/title/"
 	if isIMDB_URL := strings.HasPrefix(mediaURL, IMDBPrefix); !isIMDB_URL {
 		return nil, fmt.Errorf("the media url %s is not a valid IMDB url, it should start with: %s", mediaURL, IMDBPrefix)
 	}
 
-	job.SetExecutingStateWithValue("Waiting for a WebDriver", mediaURL)
-	wd, geckodriver, err := scraping.GetWebDriver(firefoxPath)
-	if err != nil {
-		return nil, err
-	}
-	defer wd.Close()
-	defer geckodriver.Release()
-	job.SetExecutingState("Scraping media data")
-
 	// Get the media properties
-	if err := wd.Get(mediaURL); err != nil {
+	if err := (*wd).Get(mediaURL); err != nil {
 		return nil, fmt.Errorf("could not get the page with URL: %s. Error: %s", mediaURL, err)
 	}
 
 	timeout := 10 * time.Second
-	err = wd.WaitWithTimeout(mediaNameCondition, timeout)
+	err := (*wd).WaitWithTimeout(mediaNameCondition, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("timeout while waiting for page to load")
 	}
 
 	// Name
-	mediaNameElem, err := wd.FindElement(selenium.ByXPATH, "//h1[@data-testid='hero__pageTitle']")
+	mediaNameElem, err := (*wd).FindElement(selenium.ByXPATH, "//h1[@data-testid='hero__pageTitle']")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
@@ -185,7 +191,7 @@ func GetMediaMetadata(mediaURL, firefoxPath string, job *job.Job) (*ScrapedMedia
 	}
 
 	// Cover URL
-	coverURLElem, err := wd.FindElement(selenium.ByXPATH, "//*[contains(@class, 'ipc-media--poster-l')]//img[@class='ipc-image']")
+	coverURLElem, err := (*wd).FindElement(selenium.ByXPATH, "//*[contains(@class, 'ipc-media--poster-l')]//img[@class='ipc-image']")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
@@ -195,7 +201,7 @@ func GetMediaMetadata(mediaURL, firefoxPath string, job *job.Job) (*ScrapedMedia
 	}
 
 	// Release date
-	releaseDateElem, err := wd.FindElement(selenium.ByXPATH, "//a[text()='Release date']/..//ul/li/a")
+	releaseDateElem, err := (*wd).FindElement(selenium.ByXPATH, "//a[text()='Release date']/..//ul/li/a")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
@@ -212,7 +218,7 @@ func GetMediaMetadata(mediaURL, firefoxPath string, job *job.Job) (*ScrapedMedia
 	}
 
 	// Genres
-	genreElems, err := wd.FindElements(selenium.ByXPATH, "(//div[@class='ipc-chip-list__scroller'])[1]/a")
+	genreElems, err := (*wd).FindElements(selenium.ByXPATH, "(//div[@class='ipc-chip-list__scroller'])[1]/a")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
@@ -222,7 +228,7 @@ func GetMediaMetadata(mediaURL, firefoxPath string, job *job.Job) (*ScrapedMedia
 	}
 
 	// Staff
-	staffElems, err := wd.FindElements(selenium.ByXPATH, "(//ul[@class='ipc-metadata-list ipc-metadata-list--dividers-all title-pc-list ipc-metadata-list--baseAlt'])[1]/li//li/a")
+	staffElems, err := (*wd).FindElements(selenium.ByXPATH, "(//ul[@class='ipc-metadata-list ipc-metadata-list--dividers-all title-pc-list ipc-metadata-list--baseAlt'])[1]/li//li/a")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find an element in the page: %s", err)
 	}
@@ -303,7 +309,7 @@ type MediaProperties struct {
 	Commentary          string
 }
 
-func insertMediaToDB(mp *MediaProperties) error {
+func insertMediaIntoDB(mp *MediaProperties) error {
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
 	if err != nil {
 		return err

@@ -3,7 +3,7 @@ package trackers_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/diogovalentte/dashboard/api/job"
+	"github.com/diogovalentte/dashboard/api/scraping"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -16,12 +16,6 @@ import (
 )
 
 func TestGetMediaMetadata(t *testing.T) {
-	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
 	expected := trackers.ScrapedMediaProperties{
 		Name:        "Fight Club",
 		CoverURL:    "https://m.media-amazon.com/images/M/MV5BODQ0OWJiMzktYjNlYi00MzcwLThlZWMtMzRkYTY4ZDgxNzgxXkEyXkFqcGdeQXVyNzkwMjQ5NzM@._V1_QL75_UX190_CR0,2,190,281_.jpg",
@@ -30,8 +24,22 @@ func TestGetMediaMetadata(t *testing.T) {
 		Staff:       []string{"David Fincher", "Chuck Palahniuk", "Jim Uhls", "Brad Pitt", "Edward Norton", "Meat Loaf"},
 	}
 
+	// Get media metadata
+	configs, err := util.GetConfigsWithoutDefaults("../../../configs")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	wd, geckodriver, err := scraping.GetWebDriver((*configs).Firefox.BinaryPath)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer wd.Close()
+	defer geckodriver.Release()
+
 	mediaURL := "https://www.imdb.com/title/tt0137523"
-	actual, err := trackers.GetMediaMetadata(mediaURL, configs.Firefox.BinaryPath, &job.Job{})
+	actual, err := trackers.GetMediaMetadata(mediaURL, &wd)
 	if err != nil {
 		t.Error(err)
 		return
@@ -81,6 +89,7 @@ func TestAddMediaRoute(t *testing.T) {
 	router := api.SetupRouter()
 
 	for _, mediaRequest := range addMediaRouteTestTable {
+		// Make request
 		requestBody, err := json.Marshal(mediaRequest)
 		if err != nil {
 			t.Error(err)
@@ -102,13 +111,15 @@ func TestAddMediaRoute(t *testing.T) {
 			continue
 		}
 
-		expectedMessage := "Media inserted into DB"
+		// Validate
+		expectedMessage := "Media added to DB"
 		actualMessage, exists := resMap["message"]
+		if !exists {
+			t.Error(`Response body has no field "message"`)
+			continue
+		}
+
 		if http.StatusOK != w.Code {
-			if !exists {
-				t.Error(`Response body has no field "message"`)
-				continue
-			}
 			if actualMessage == "UNIQUE constraint failed: medias_tracker.name" {
 				t.Log("Game already in database")
 				continue
