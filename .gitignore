@@ -5,11 +5,10 @@ __pycache__
 
 # Etc
 etc/*/
-!etc/docker
 !etc/nginx
 !etc/systemd
 dashboard-api
-.docker-python-venv
+.idea
 
 configs.json
 credentials.yaml
