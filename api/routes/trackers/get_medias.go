@@ -232,7 +232,7 @@ ORDER BY
 	c.JSON(http.StatusOK, gin.H{"medias": medias})
 }
 
-func getMediasFromQuery(sqlQuery string) ([]*MediaProperties, error) {
+func getMediasFromQuery(sqlQuery string) ([]*GetMediaProperties, error) {
 	configs, err := util.GetConfigsWithoutDefaults("../../../configs/")
 	if err != nil {
 		return nil, err
@@ -251,9 +251,9 @@ func getMediasFromQuery(sqlQuery string) ([]*MediaProperties, error) {
 	}
 	defer rows.Close()
 
-	var mediasProperties []*MediaProperties
+	var mediasProperties []*GetMediaProperties
 	for rows.Next() {
-		mediaProperties := MediaProperties{}
+		mediaProperties := GetMediaProperties{}
 		var genresStr string
 		var staffStr string
 		err = rows.Scan(
@@ -280,4 +280,20 @@ func getMediasFromQuery(sqlQuery string) ([]*MediaProperties, error) {
 	}
 
 	return mediasProperties, nil
+}
+
+type GetMediaProperties struct {
+	URL                 string
+	Name                string
+	MediaType           int
+	CoverImg            []byte
+	ReleaseDate         time.Time
+	Genres              []string
+	Staff               []string
+	Priority            int
+	Status              int
+	Stars               int
+	StartedDate         time.Time
+	FinishedDroppedDate time.Time
+	Commentary          string
 }
