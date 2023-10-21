@@ -236,6 +236,7 @@ func GetGameMetadata(gameURL string, wd *selenium.WebDriver) (*ScrapedGameProper
 
 	// Release date
 	var releaseDate time.Time
+	var secondErr error
 	releaseDateElem, err := (*wd).FindElement(selenium.ByXPATH, "//div[@class='release_date']/div[@class='date']")
 	if err != nil {
 		if err.Error() != "no such element: Unable to locate element: //div[@class='release_date']/div[@class='date']" {
@@ -253,7 +254,11 @@ func GetGameMetadata(gameURL string, wd *selenium.WebDriver) (*ScrapedGameProper
 			steamLayout := "2 Jan, 2006"
 			releaseDate, err = time.Parse(steamLayout, releaseDateStr)
 			if err != nil {
-				return nil, err
+				steamLayout := "Jan 2, 2006"
+				releaseDate, secondErr = time.Parse(steamLayout, releaseDateStr)
+				if secondErr != nil {
+					return nil, err
+				}
 			}
 		}
 	}
