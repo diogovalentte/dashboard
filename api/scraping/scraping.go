@@ -15,8 +15,10 @@ import (
 	"github.com/tebeka/selenium/firefox"
 )
 
-var geckoDriverPoolStartPort = 30000
-var geckoDriverPool GeckoDriverPool
+var (
+	geckoDriverPoolStartPort = 30000
+	geckoDriverPool          GeckoDriverPool
+)
 
 func NewGeckoDriverPool(geckoDriverPath string, size int) (*GeckoDriverPool, error) {
 	if !reflect.DeepEqual(geckoDriverPool, GeckoDriverPool{}) {
@@ -246,7 +248,7 @@ func GetWebDriver(firefoxPath string) (selenium.WebDriver, *GeckoDriverServer, e
 
 	// Connect to the GeckoDriver server running locally
 	caps := selenium.Capabilities{"browserName": "firefox"}
-	args := []string{"--headless"}
+	args := []string{"--headless", "--private-window"}
 	firefoxCaps := firefox.Capabilities{
 		Binary: firefoxPath,
 		Args:   args,
