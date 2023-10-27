@@ -24,8 +24,12 @@ tar -xvf /tmp/geckodriver.tar.gz -C /opt/geckodriver/
 4. Install [Nginx](https://www.nginx.com). Nginx will act as a **reverse proxy** for the Streamlit dashboard app.
 5. Create the file **configs/configs.json** with some configs and credentials. This file should follow the structure of the **configs/configs.example.json** file.
 6. The dashboard uses the [Streamlit Authenticator](https://github.com/mkhorasani/Streamlit-Authenticator/tree/main) module, check [here](https://github.com/mkhorasani/Streamlit-Authenticator/tree/main#1-hashing-passwords) how to create the file **.streamlit/credentials/credentials.yaml** (should be at this location!) with the users/passwords used to login in the dashboard.
-7. Open the ports 80 and 443 in your **firewall** or **Security Group**.
-8. Configure the Nginx reverse-proxy by changing the **server_name** value from **etc/nginx/dashboard** to your domain name.
+7. Create the database:
+```sh
+python scripts/setup_db.py
+```
+8. Open the ports 80 and 443 in your **firewall** or **Security Group**.
+9. Configure the Nginx reverse-proxy by changing the **server_name** value from **etc/nginx/dashboard** to your domain name.
 ```
 server {
     listen 80;
